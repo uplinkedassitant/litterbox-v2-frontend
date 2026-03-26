@@ -154,20 +154,39 @@ export async function submitDeposit(
   console.log('Creating transaction with', instructions.length, 'instructions')
   
   // Get latest blockhash
-  const { blockhash } = await connection.getLatestBlockhash()
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash()
   
-  // Create transaction
+  // Create transaction with instructions
   const transaction = new Transaction()
-  transaction.recentBlockhash = blockhash
   transaction.feePayer = publicKey
+  transaction.recentBlockhash = blockhash
+  transaction.lastValidBlockHeight = lastValidBlockHeight
   
   // Add all instructions
   instructions.forEach(ix => transaction.add(ix))
   
+  console.log('Transaction created:')
+  console.log('- Instructions:', transaction.instructions.length)
+  console.log('- Fee payer:', transaction.feePayer?.toString())
+  console.log('- Blockhash:', transaction.recentBlockhash)
+  
   console.log('Sending transaction via wallet adapter...')
+  console.log('Transaction instructions:', transaction.instructions.length)
+  console.log('Transaction feePayer:', transaction.feePayer?.toString())
+  console.log('Transaction recentBlockhash:', transaction.recentBlockhash)
   
   // Use wallet adapter's sendTransaction (handles signing)
-  const { value: { signature } } = await sendTransaction(transaction, connection)
+  let signature
+  try {
+    const result = await sendTransaction(transaction, connection, { skipPreflight: true })
+    signature = result.value
+    console.log('Transaction sent, waiting for confirmation...')
+  } catch (error) {
+    console.error('sendTransaction error:', error)
+    console.error('Error name:', error.name)
+    console.error('Error message:', error.message)
+    throw error
+  }
   
   console.log('Transaction sent:', signature)
   console.log('Waiting for confirmation...')
