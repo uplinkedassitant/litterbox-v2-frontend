@@ -44,13 +44,13 @@ function PoolStats() {
 }
 
 // Wallet Content - shown when wallet is connected
-function ConnectedContent({ wallet }) {
+function ConnectedContent({ publicKey }) {
   return (
     <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 text-center">
       <div className="text-6xl mb-4">✅</div>
       <h3 className="text-2xl font-bold text-green-800 mb-2">Wallet Connected!</h3>
       <p className="text-green-700 mb-4">
-        Connected to: <strong>{wallet.publicKey.toString().slice(0, 4)}...{wallet.publicKey.toString().slice(-4)}</strong>
+        Connected to: <strong>{publicKey?.toString().slice(0, 4)}...{publicKey?.toString().slice(-4)}</strong>
       </p>
       <p className="text-green-600 text-sm">
         Token balances and deposit form coming in next phase!
@@ -61,7 +61,7 @@ function ConnectedContent({ wallet }) {
 
 // Main App Content (uses wallet hooks)
 function AppContent() {
-  const { connected, wallet, disconnect } = useWallet()
+  const { connected, publicKey } = useWallet()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -97,7 +97,7 @@ function AppContent() {
             <WalletMultiButton />
           </div>
         ) : (
-          <ConnectedContent wallet={wallet} />
+          <ConnectedContent publicKey={publicKey} />
         )}
       </main>
 
