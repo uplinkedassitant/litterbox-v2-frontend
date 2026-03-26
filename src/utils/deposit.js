@@ -12,7 +12,6 @@ import {
 import { 
   TOKEN_PROGRAM_ID, 
   getAssociatedTokenAddress,
-  createTransferInstruction,
 } from '@solana/spl-token';
 
 // Program configuration
@@ -31,13 +30,11 @@ const DISC_DEPOSIT = 1;
  */
 async function createDepositInstruction(
   connection,
-  wallet,
+  userPubkey,
   tokenMint,
   amount,
   tokenDecimals = 6
 ) {
-  const userPubkey = wallet.publicKey;
-  
   // Get user's token account for the deposit token
   const userTokenAccount = await getAssociatedTokenAddress(
     new PublicKey(tokenMint),
@@ -102,92 +99,94 @@ async function createDepositInstruction(
  */
 export async function submitDeposit(
   connection,
-  wallet,
+  publicKey,
   amounts, // { [mint]: amount }
-  tokens   // Array of token objects
+  tokens,   // Array of token objects
+  sendTransaction // Wallet adapter's sendTransaction function
 ) {
-  if (!wallet.publicKey) {
-    throw new Error('Wallet not connected');
+  if (!publicKey) {
+    throw new Error('No publicKey provided')
   }
   
-  console.log('Starting deposit...', { amounts, tokens });
+  console.log('Deposit with publicKey:', publicKey.toString())
+  console.log('Submitting deposit...', { amounts, tokens })
   
-  const instructions = [];
-  const depositDetails = [];
+  const instructions = []
+  const depositDetails = []
   
   // Create deposit instruction for each token
   for (const [mint, amount] of Object.entries(amounts)) {
-    if (!amount || amount <= 0) continue;
+    if (!amount || amount <= 0) continue
     
-    const token = tokens.find(t => t.mint === mint);
-    if (!token) continue;
+    const token = tokens.find(t => t.mint === mint)
+    if (!token) continue
     
     try {
       const { instruction } = await createDepositInstruction(
         connection,
-        wallet,
+        publicKey,
         mint,
         amount,
         token.decimals || 6
-      );
+      )
       
-      instructions.push(instruction);
+      instructions.push(instruction)
       depositDetails.push({
         token: token.symbol,
         amount,
         mint,
-      });
+      })
     } catch (error) {
-      console.error(`Error creating deposit instruction for ${token.symbol}:`, error);
-      throw new Error(`Failed to create deposit for ${token.symbol}: ${error.message}`);
+      console.error(`Error creating deposit instruction for ${token.symbol}:`, error)
+      throw new Error(`Failed to create deposit for ${token.symbol}: ${error.message}`)
     }
   }
   
   if (instructions.length === 0) {
-    throw new Error('No valid deposits to submit');
+    throw new Error('No valid deposits to submit')
   }
   
-  console.log('Creating transaction with', instructions.length, 'instructions');
+  console.log('Creating transaction with', instructions.length, 'instructions')
   
   // Get latest blockhash
-  const { blockhash } = await connection.getLatestBlockhash();
+  const { blockhash } = await connection.getLatestBlockhash()
   
   // Create transaction
-  const transaction = new Transaction();
-  transaction.recentBlockhash = blockhash;
-  transaction.feePayer = wallet.publicKey;
+  const transaction = new Transaction()
+  transaction.recentBlockhash = blockhash
+  transaction.feePayer = publicKey
   
   // Add all instructions
-  instructions.forEach(ix => transaction.add(ix));
+  instructions.forEach(ix => transaction.add(ix))
   
-  console.log('Sending transaction...');
+  console.log('Sending transaction via wallet adapter...')
   
-  // Sign and send
-  const signature = await wallet.sendTransaction(transaction, connection);
+  // Use wallet adapter's sendTransaction (handles signing)
+  const { value: { signature } } = await sendTransaction(transaction, connection)
   
-  console.log('Transaction sent:', signature);
-  console.log('Waiting for confirmation...');
+  console.log('Transaction sent:', signature)
+  console.log('Waiting for confirmation...')
   
   // Wait for confirmation
-  const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+  const confirmation = await connection.confirmTransaction(signature, 'confirmed')
   
   if (confirmation.value.err) {
-    throw new Error(`Transaction failed: ${confirmation.value.err}`);
+    throw new Error(`Transaction failed: ${confirmation.value.err}`)
   }
   
   console.log('✅ Deposit successful!', {
     signature,
     deposits: depositDetails,
-  });
+  })
   
   return {
     signature,
     deposits: depositDetails,
-  };
+  }
 }
 
 export default {
   submitDeposit,
   PROGRAM_ID,
   LITTER_MINT,
-};
+}

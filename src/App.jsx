@@ -107,8 +107,13 @@ function ConnectedContent({ publicKey, userBalances, isLoading, poolData, onDepo
 
 // Main App Content
 function AppContent() {
-  const { connected, publicKey, wallet } = useWallet()
+  const { connected, publicKey, wallet, sendTransaction } = useWallet()
   const { connection } = useConnection()
+  
+  console.log('AppContent - connected:', connected)
+  console.log('AppContent - publicKey:', publicKey?.toString())
+  console.log('AppContent - wallet:', wallet)
+  console.log('AppContent - sendTransaction:', typeof sendTransaction)
   const [poolData, setPoolData] = useState({
     totalLiquidity: 0,
     totalLitterMinted: 0,
@@ -164,29 +169,37 @@ function AppContent() {
   // Handle deposit
   const handleDeposit = async (amounts) => {
     console.log('Submitting deposit:', amounts)
-    console.log('Wallet object:', wallet)
-    console.log('Wallet publicKey:', wallet?.publicKey)
+    console.log('Using publicKey:', publicKey?.toString())
     console.log('Connection RPC:', connection?.rpcEndpoint)
+    console.log('sendTransaction function:', typeof sendTransaction)
     
     // Check wallet state
-    if (!wallet) {
-      throw new Error('Wallet adapter not initialized')
+    if (!connected || !publicKey) {
+      throw new Error('Wallet not connected')
     }
     
-    if (!wallet.publicKey) {
-      throw new Error('Wallet not connected - no publicKey')
+    if (!sendTransaction) {
+      throw new Error('Wallet does not support sendTransaction')
     }
     
-    console.log('Proceeding with deposit for publicKey:', wallet.publicKey.toString())
+    console.log('Proceeding with deposit for:', publicKey.toString())
     
-    const result = await submitDeposit(connection, wallet, amounts, userBalances)
-    console.log('✅ Deposit successful!', result)
+    // Import the deposit logic
+    const { submitDeposit } = await import('./utils/deposit')
     
-    // Refresh pool stats
-    const stats = await fetchPoolStats(connection)
-    setPoolData(stats)
-    
-    return result
+    try {
+      const result = await submitDeposit(connection, publicKey, amounts, userBalances, sendTransaction)
+      console.log('✅ Deposit successful!', result)
+      
+      // Refresh pool stats
+      const stats = await fetchPoolStats(connection)
+      setPoolData(stats)
+      
+      return result
+    } catch (error) {
+      console.error('Deposit failed:', error)
+      throw error
+    }
   }
 
   return (
