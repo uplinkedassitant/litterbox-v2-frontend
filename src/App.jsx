@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { ConnectionProvider, WalletProvider, useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { Wallet as WalletIcon, TrendingUp, Coins, CheckCircle, RefreshCw } from 'lucide-react'
+import { clusterApiUrl } from '@solana/web3.js'
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
-// Configuration - Hardcoded Devnet URL to ensure it always works
-// Environment variables can be set in Vercel dashboard, but we default to Devnet
-const RPC_URL = 'https://api.devnet.solana.com'
+// Configuration - Use official Solana clusterApiUrl for Devnet
+const RPC_URL = clusterApiUrl('devnet')
 
 // Mock data for now
 const MOCK_POOL_DATA = {
