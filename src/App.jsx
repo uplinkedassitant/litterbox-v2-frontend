@@ -6,6 +6,7 @@ import { clusterApiUrl } from '@solana/web3.js'
 import { fetchPoolStats } from './utils/poolStats'
 import { fetchUserBalances, SUPPORTED_TOKENS } from './utils/userBalances'
 import TokenSelector from './components/TokenSelector'
+import DepositForm from './components/DepositForm'
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
@@ -50,8 +51,9 @@ function PoolStats({ poolData, isLoading, error }) {
 }
 
 // Wallet Content - shown when wallet is connected
-function ConnectedContent({ publicKey, userBalances, isLoading }) {
+function ConnectedContent({ publicKey, userBalances, isLoading, poolData }) {
   const [selectedTokens, setSelectedTokens] = useState([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleToggleToken = (token) => {
     setSelectedTokens(prev => {
@@ -62,6 +64,19 @@ function ConnectedContent({ publicKey, userBalances, isLoading }) {
         return [...prev, token]
       }
     })
+  }
+
+  const handleDeposit = async (amounts) => {
+    setIsSubmitting(true)
+    try {
+      console.log('Depositing:', amounts)
+      // TODO: Implement actual deposit transaction
+      alert('Deposit functionality coming in Step 5! This will submit the actual transaction to the program.')
+    } catch (error) {
+      console.error('Deposit failed:', error)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -82,29 +97,14 @@ function ConnectedContent({ publicKey, userBalances, isLoading }) {
         isLoading={isLoading}
       />
 
-      {/* Selected tokens preview */}
+      {/* Deposit Form - only show if tokens selected */}
       {selectedTokens.length > 0 && (
-        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
-          <h3 className="text-lg font-bold text-blue-800 mb-3">
-            Selected Tokens ({selectedTokens.length})
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {selectedTokens.map(token => (
-              <div key={token.mint} className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg border border-blue-200">
-                <span>{token.icon}</span>
-                <span className="font-semibold text-gray-800">{token.symbol}</span>
-                <span className="text-sm text-gray-600">
-                  {token.balanceUi ? token.balanceUi.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '0'}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 pt-4 border-t border-blue-200">
-            <p className="text-sm text-blue-700">
-              💡 Next: Enter deposit amounts and see real-time calculations
-            </p>
-          </div>
-        </div>
+        <DepositForm
+          selectedTokens={selectedTokens}
+          poolData={poolData}
+          onDeposit={handleDeposit}
+          isSubmitting={isSubmitting}
+        />
       )}
     </div>
   )
@@ -209,6 +209,7 @@ function AppContent() {
             publicKey={publicKey} 
             userBalances={userBalances}
             isLoading={isLoadingBalances}
+            poolData={poolData}
           />
         )}
       </main>
