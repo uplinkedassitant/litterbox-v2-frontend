@@ -1,20 +1,38 @@
 import React, { useState, useEffect } from 'react'
 import { ArrowRight, AlertCircle, RefreshCw } from 'lucide-react'
 
+// Token prices in USDC (would fetch from API in production)
+const TOKEN_PRICES = {
+  'USDC': 1.0,
+  'SOL': 150.0, // Example price - 1 SOL = $150 USDC
+  'BONK': 0.00001,
+  'WIF': 2.5,
+  'POPCAT': 0.5,
+}
+
+/**
+ * Convert token amount to USDC value
+ */
+function toUsdcValue(amount, symbol) {
+  const price = TOKEN_PRICES[symbol] || 1.0
+  return amount * price
+}
+
 /**
  * Calculate Litter tokens for deposit using bonding curve
- * Formula: litterAmount = usdcAmount * (totalLitterMinted / totalLiquidity)
+ * All tokens are converted to USDC value first, then bonding curve applies
+ * Formula: litterAmount = usdcValue * (totalLitterMinted / totalLiquidity)
  */
-function calculateLitterForDeposit(amount, poolData) {
+function calculateLitterForDeposit(usdcValue, poolData) {
   const { totalLiquidity = 0, totalLitterMinted = 0 } = poolData || {}
   
   // If no liquidity yet, use 1:1 ratio
   if (totalLiquidity === 0 || totalLitterMinted === 0) {
-    return amount
+    return usdcValue
   }
   
   // Bonding curve formula
-  return amount * (totalLitterMinted / totalLiquidity)
+  return usdcValue * (totalLitterMinted / totalLiquidity)
 }
 
 /**
@@ -30,16 +48,14 @@ function DepositForm({ selectedTokens, poolData, onDeposit, isSubmitting }) {
   const [amounts, setAmounts] = useState({})
   const [error, setError] = useState(null)
   
-  // Calculate totals
-  const totalValue = Object.entries(amounts).reduce((total, [mint, amount]) => {
-    return total + (parseFloat(amount) || 0)
+  // Calculate total USDC value
+  const totalValue = selectedTokens.reduce((total, token) => {
+    const amount = parseFloat(amounts[token.mint]) || 0
+    return total + toUsdcValue(amount, token.symbol)
   }, 0)
   
-  // Calculate estimated Litter tokens
-  const estimatedLitter = selectedTokens.reduce((total, token) => {
-    const amount = parseFloat(amounts[token.mint]) || 0
-    return total + calculateLitterForDeposit(amount, poolData)
-  }, 0)
+  // Calculate estimated Litter tokens (bonding curve applies to USDC value)
+  const estimatedLitter = calculateLitterForDeposit(totalValue, poolData)
   
   const handleAmountChange = (mint, value) => {
     // Only allow positive numbers and decimals
@@ -159,10 +175,10 @@ function DepositForm({ selectedTokens, poolData, onDeposit, isSubmitting }) {
             <span className="text-gray-600">Total Deposit Value:</span>
             <span className="text-xl font-bold text-gray-800">${totalValue.toFixed(2)}</span>
           </div>
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-gray-600">Bonding Curve Rate:</span>
-            <span className="font-medium text-gray-700">
-              1 USDC = {(poolData.totalLitterMinted / poolData.totalLiquidity || 1).toFixed(4)} LITTER
+          <div className="flex justify-between items-center mb-2 text-sm text-gray-600">
+            <span>Converted to USDC value</span>
+            <span className="font-medium">
+              Rate: 1 USDC = {(poolData.totalLitterMinted / poolData.totalLiquidity || 1).toFixed(4)} LITTER
             </span>
           </div>
           <div className="border-t border-primary-200 pt-3 mt-3">
