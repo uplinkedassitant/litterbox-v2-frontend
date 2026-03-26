@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { ArrowRight, AlertCircle, RefreshCw } from 'lucide-react'
+import { ArrowRight, AlertCircle, RefreshCw, CheckCircle } from 'lucide-react'
+import { submitDeposit } from '../utils/deposit'
 
 // Token prices in USDC (would fetch from API in production)
 const TOKEN_PRICES = {
@@ -87,7 +88,10 @@ function DepositForm({ selectedTokens, poolData, onDeposit, isSubmitting }) {
       }
     }
     
+    // Call the real deposit function
     await onDeposit(amounts)
+    
+    // Clear amounts on success
     setAmounts({})
   }
   

@@ -7,6 +7,7 @@ import { fetchPoolStats } from './utils/poolStats'
 import { fetchUserBalances, SUPPORTED_TOKENS } from './utils/userBalances'
 import TokenSelector from './components/TokenSelector'
 import DepositForm from './components/DepositForm'
+import { submitDeposit } from './utils/deposit'
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
@@ -69,11 +70,31 @@ function ConnectedContent({ publicKey, userBalances, isLoading, poolData }) {
   const handleDeposit = async (amounts) => {
     setIsSubmitting(true)
     try {
-      console.log('Depositing:', amounts)
-      // TODO: Implement actual deposit transaction
-      alert('Deposit functionality coming in Step 5! This will submit the actual transaction to the program.')
+      console.log('Submitting deposit:', amounts)
+      
+      // Get connection from wallet adapter
+      const { connection } = useConnection()
+      
+      // Call the real deposit function
+      const result = await submitDeposit(
+        connection,
+        wallet,
+        amounts,
+        userBalances
+      )
+      
+      console.log('✅ Deposit successful!', result)
+      
+      // Show success message
+      alert(`✅ Deposit successful!\n\nSignature: ${result.signature}\n\nDeposited: ${result.deposits.map(d => `${d.amount} ${d.token}`).join(', ')}`)
+      
+      // Refresh pool stats after successful deposit
+      const stats = await fetchPoolStats(connection)
+      setPoolData(stats)
+      
     } catch (error) {
       console.error('Deposit failed:', error)
+      alert(`❌ Deposit failed: ${error.message}`)
     } finally {
       setIsSubmitting(false)
     }
@@ -102,7 +123,7 @@ function ConnectedContent({ publicKey, userBalances, isLoading, poolData }) {
         <DepositForm
           selectedTokens={selectedTokens}
           poolData={poolData}
-          onDeposit={handleDeposit}
+          onDeposit={handleSubmit}
           isSubmitting={isSubmitting}
         />
       )}
@@ -112,7 +133,7 @@ function ConnectedContent({ publicKey, userBalances, isLoading, poolData }) {
 
 // Main App Content (uses wallet hooks)
 function AppContent() {
-  const { connected, publicKey } = useWallet()
+  const { connected, publicKey, wallet } = useWallet()
   const { connection } = useConnection()
   const [poolData, setPoolData] = useState({
     totalLiquidity: 0,
@@ -171,6 +192,27 @@ function AppContent() {
     loadBalances()
   }, [connected, publicKey, connection])
 
+  // Handle deposit submission
+  const handleDeposit = async (amounts) => {
+    console.log('Submitting deposit:', amounts)
+    
+    // Call the real deposit function
+    const result = await submitDeposit(
+      connection,
+      wallet,
+      amounts,
+      userBalances
+    )
+    
+    console.log('✅ Deposit successful!', result)
+    
+    // Refresh pool stats after successful deposit
+    const stats = await fetchPoolStats(connection)
+    setPoolData(stats)
+    
+    return result
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -210,6 +252,7 @@ function AppContent() {
             userBalances={userBalances}
             isLoading={isLoadingBalances}
             poolData={poolData}
+            onDeposit={handleDeposit}
           />
         )}
       </main>
