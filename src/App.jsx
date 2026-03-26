@@ -11,15 +11,10 @@ import { submitDeposit } from './utils/deposit'
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
-// Configuration - Use official Solana clusterApiUrl for Devnet
-const RPC_URL = clusterApiUrl('devnet')
-
 // Pool Stats Component
 function PoolStats({ poolData, isLoading, error }) {
-  // Format numbers nicely
   const formatNumber = (num) => {
     if (!num || num === 0) return '0';
-    // If it's a large number, assume it's in micro-units and divide
     const value = num > 10000 ? num / 1_000_000 : num;
     return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
   };
@@ -51,10 +46,9 @@ function PoolStats({ poolData, isLoading, error }) {
   )
 }
 
-// Wallet Content - shown when wallet is connected
-function ConnectedContent({ publicKey, userBalances, isLoading, poolData }) {
+// Wallet Content Component
+function ConnectedContent({ publicKey, userBalances, isLoading, poolData, onDeposit, isSubmitting, setIsSubmitting }) {
   const [selectedTokens, setSelectedTokens] = useState([])
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleToggleToken = (token) => {
     setSelectedTokens(prev => {
@@ -70,31 +64,10 @@ function ConnectedContent({ publicKey, userBalances, isLoading, poolData }) {
   const handleDeposit = async (amounts) => {
     setIsSubmitting(true)
     try {
-      console.log('Submitting deposit:', amounts)
-      
-      // Get connection from wallet adapter
-      const { connection } = useConnection()
-      
-      // Call the real deposit function
-      const result = await submitDeposit(
-        connection,
-        wallet,
-        amounts,
-        userBalances
-      )
-      
-      console.log('✅ Deposit successful!', result)
-      
-      // Show success message
-      alert(`✅ Deposit successful!\n\nSignature: ${result.signature}\n\nDeposited: ${result.deposits.map(d => `${d.amount} ${d.token}`).join(', ')}`)
-      
-      // Refresh pool stats after successful deposit
-      const stats = await fetchPoolStats(connection)
-      setPoolData(stats)
-      
+      await onDeposit(amounts)
     } catch (error) {
       console.error('Deposit failed:', error)
-      alert(`❌ Deposit failed: ${error.message}`)
+      throw error
     } finally {
       setIsSubmitting(false)
     }
@@ -110,7 +83,6 @@ function ConnectedContent({ publicKey, userBalances, isLoading, poolData }) {
         </p>
       </div>
 
-      {/* Token Selector */}
       <TokenSelector
         tokens={userBalances}
         selectedTokens={selectedTokens}
@@ -118,12 +90,11 @@ function ConnectedContent({ publicKey, userBalances, isLoading, poolData }) {
         isLoading={isLoading}
       />
 
-      {/* Deposit Form - only show if tokens selected */}
       {selectedTokens.length > 0 && (
         <DepositForm
           selectedTokens={selectedTokens}
           poolData={poolData}
-          onDeposit={handleDepositSubmit}
+          onDeposit={handleDeposit}
           isSubmitting={isSubmitting}
         />
       )}
@@ -131,7 +102,7 @@ function ConnectedContent({ publicKey, userBalances, isLoading, poolData }) {
   )
 }
 
-// Main App Content (uses wallet hooks)
+// Main App Content
 function AppContent() {
   const { connected, publicKey, wallet } = useWallet()
   const { connection } = useConnection()
@@ -145,8 +116,9 @@ function AppContent() {
   const [error, setError] = useState(null)
   const [userBalances, setUserBalances] = useState([])
   const [isLoadingBalances, setIsLoadingBalances] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Fetch pool stats on mount
+  // Fetch pool stats
   useEffect(() => {
     const loadPoolStats = async () => {
       setIsLoading(true)
@@ -154,9 +126,7 @@ function AppContent() {
       try {
         const stats = await fetchPoolStats(connection)
         setPoolData(stats)
-        if (stats.error) {
-          setError(stats.error)
-        }
+        if (stats.error) setError(stats.error)
       } catch (err) {
         console.error('Error loading pool stats:', err)
         setError('Failed to load pool statistics')
@@ -164,49 +134,37 @@ function AppContent() {
         setIsLoading(false)
       }
     }
-
     loadPoolStats()
   }, [connection])
 
-  // Fetch user balances when wallet connects
+  // Fetch user balances
   useEffect(() => {
     if (!connected || !publicKey) {
       setUserBalances([])
       return
     }
-
     const loadBalances = async () => {
       setIsLoadingBalances(true)
       try {
         const balances = await fetchUserBalances(connection, publicKey.toString())
         setUserBalances(balances)
-        console.log('User token balances:', balances)
       } catch (err) {
-        console.error('Error loading user balances:', err)
+        console.error('Error loading balances:', err)
         setUserBalances([])
       } finally {
         setIsLoadingBalances(false)
       }
     }
-
     loadBalances()
   }, [connected, publicKey, connection])
 
-  // Handle deposit submission
+  // Handle deposit
   const handleDeposit = async (amounts) => {
     console.log('Submitting deposit:', amounts)
-    
-    // Call the real deposit function
-    const result = await submitDeposit(
-      connection,
-      wallet,
-      amounts,
-      userBalances
-    )
-    
+    const result = await submitDeposit(connection, wallet, amounts, userBalances)
     console.log('✅ Deposit successful!', result)
     
-    // Refresh pool stats after successful deposit
+    // Refresh pool stats
     const stats = await fetchPoolStats(connection)
     setPoolData(stats)
     
@@ -215,7 +173,6 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -229,18 +186,13 @@ function AppContent() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Pool Stats - Always visible */}
         <PoolStats poolData={poolData} isLoading={isLoading} error={error} />
 
-        {/* Wallet Connection State */}
         {!connected ? (
           <div className="text-center py-12 bg-white rounded-xl shadow-lg">
             <div className="text-6xl mb-4">👋</div>
-            <h2 className="text-3xl font-bold text-gray-800 mb-4">
-              Connect Your Wallet to Start
-            </h2>
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">Connect Your Wallet to Start</h2>
             <p className="text-gray-600 mb-8 max-w-md mx-auto">
               Connect your Solana wallet to view your tokens and start recycling meme tokens
             </p>
@@ -253,11 +205,12 @@ function AppContent() {
             isLoading={isLoadingBalances}
             poolData={poolData}
             onDeposit={handleDeposit}
+            isSubmitting={isSubmitting}
+            setIsSubmitting={setIsSubmitting}
           />
         )}
       </main>
 
-      {/* Footer */}
       <footer className="bg-white border-t border-gray-100 mt-12 py-6">
         <div className="max-w-7xl mx-auto px-4 text-center text-gray-500 text-sm">
           <p>♻️ LitterBox v2 - Built on Solana</p>
