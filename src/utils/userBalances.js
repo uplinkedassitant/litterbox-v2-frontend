@@ -69,7 +69,9 @@ export async function fetchUserBalances(connection, walletAddress) {
     // Filter to only show tokens with balance > 0 or are in supported list
     const result = balances.filter(b => b.balanceUi > 0 || b.symbol === 'USDC');
     
-    console.log('User balances:', result);
+    console.log('All balances:', balances);
+    console.log('Filtered result:', result);
+    console.log('USDC balance:', balances.find(b => b.symbol === 'USDC'));
     return result;
   } catch (error) {
     console.error('Error fetching user balances:', error);
