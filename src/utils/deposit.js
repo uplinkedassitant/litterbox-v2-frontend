@@ -24,69 +24,83 @@ const POOL_ACCOUNT = new PublicKey('Gz6sd1RT2xFt7QxfNrR7pEpxvqPkqTUV4GKLxZ7XnTMu
 
 // Instruction discriminators
 const DISC_DEPOSIT = 1;
+const DISC_DEPOSIT_MULTI = 5; // Multi-token with Jupiter swap
 
 /**
- * Create deposit instruction for a single token
+ * Create multi-token deposit instruction with Jupiter auto-swap
+ * Uses discriminator 5 (deposit_multi) to enable Jupiter swap
  */
-async function createDepositInstruction(
+async function createDepositMultiInstruction(
   connection,
   userPubkey,
-  tokenMint,
-  amount,
-  tokenDecimals = 6
+  amounts, // { [mint]: amount }
+  tokens   // Array of token objects
 ) {
-  // Get user's token account for the deposit token
-  const userTokenAccount = await getAssociatedTokenAddress(
-    new PublicKey(tokenMint),
-    userPubkey
-  );
+  // Get user's token accounts for all tokens
+  const userTokenAccounts = [];
+  const poolTokenAccounts = [];
   
-  // Get user's Litter token account
+  for (const [mint, amount] of Object.entries(amounts)) {
+    const token = tokens.find(t => t.mint === mint);
+    if (!token) continue;
+    
+    // Get user's token account
+    const userTokenAccount = await getAssociatedTokenAddress(
+      new PublicKey(mint),
+      userPubkey
+    );
+    userTokenAccounts.push(userTokenAccount);
+    
+    // Get pool's token account
+    const poolTokenAccount = await getAssociatedTokenAddress(
+      new PublicKey(mint),
+      POOL_ACCOUNT,
+      true
+    );
+    poolTokenAccounts.push(poolTokenAccount);
+  }
+  
+  // Get user's and pool's Litter token accounts
   const userLitterAccount = await getAssociatedTokenAddress(
     LITTER_MINT,
     userPubkey
   );
   
-  // Get pool's token account for the deposit token
-  const poolTokenAccount = await getAssociatedTokenAddress(
-    new PublicKey(tokenMint),
-    POOL_ACCOUNT,
-    true // Allow owner to be a PDA
-  );
-  
-  // Get pool's Litter token account
   const poolLitterAccount = await getAssociatedTokenAddress(
     LITTER_MINT,
     POOL_ACCOUNT,
     true
   );
   
-  // Create deposit instruction data
-  // Format: [discriminator (1 byte), usdc_amount (8 bytes), min_litter_out (8 bytes)]
-  // Total: 17 bytes
-  // Use Uint8Array instead of Buffer for browser compatibility
-  const data = new Uint8Array(17);
-  data[0] = DISC_DEPOSIT;
+  // Create deposit_multi instruction data
+  // Format: [discriminator (1 byte), token_count (1 byte), min_litter_out (8 bytes)]
+  // Total: 10 bytes
+  const data = new Uint8Array(10);
+  data[0] = DISC_DEPOSIT_MULTI; // Discriminator 5
+  data[1] = Object.keys(amounts).length; // token_count
+  // min_litter_out = 0 (bytes 2-9)
+  // No slippage protection for now
   
-  // Write usdc_amount as u64 little-endian (bytes 1-8)
-  const usdcAmountBN = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
-  for (let i = 0; i < 8; i++) {
-    data[i + 1] = Number((usdcAmountBN >> (8n * BigInt(i))) & 0xFFn);
-  }
+  console.log('Creating deposit_multi instruction:');
+  console.log('- Discriminator:', DISC_DEPOSIT_MULTI);
+  console.log('- Token count:', Object.keys(amounts).length);
+  console.log('- Tokens:', Object.keys(amounts).join(', '));
   
-  // Write min_litter_out as u64 little-endian (bytes 9-16)
-  // Set to 0 for no minimum (or calculate based on slippage tolerance)
-  const minLitterOut = 0n;
-  for (let i = 0; i < 8; i++) {
-    data[i + 9] = Number((minLitterOut >> (8n * BigInt(i))) & 0xFFn);
-  }
-  
-  // Create the instruction
-  // Backend expects only 3 accounts: user, config, pool
+  // Create the instruction accounts
+  // Backend expects:
+  // 0. user [signer, writable]
+  // 1. config [writable]
+  // 2. virtual_pool [writable]
+  // 3. token_accounts[] [writable] - one per token
+  // 4. usdc_vault [writable]
+  // 5. litter_vault [writable]
   const keys = [
     { pubkey: userPubkey, isSigner: true, isWritable: true },
     { pubkey: CONFIG_ACCOUNT, isSigner: false, isWritable: true },
     { pubkey: POOL_ACCOUNT, isSigner: false, isWritable: true },
+    ...userTokenAccounts.map(pubkey => ({ pubkey, isSigner: false, isWritable: true })),
+    { pubkey: CONFIG_ACCOUNT, isSigner: false, isWritable: true }, // USDC vault (using config as placeholder)
+    { pubkey: LITTER_MINT, isSigner: false, isWritable: true }, // Litter vault (using mint as placeholder)
   ];
   
   const instruction = new TransactionInstruction({
@@ -97,8 +111,8 @@ async function createDepositInstruction(
   
   return {
     instruction,
-    tokenMint,
-    amount,
+    tokenCount: Object.keys(amounts).length,
+    amounts,
   };
 }
 
@@ -119,74 +133,47 @@ export async function submitDeposit(
   console.log('Deposit with publicKey:', publicKey.toString())
   console.log('Submitting deposit...', { amounts, tokens })
   
-  const instructions = []
-  const depositDetails = []
+  // Validate we have tokens to deposit
+  if (Object.keys(amounts).length === 0) {
+    throw new Error('No tokens to deposit')
+  }
   
-  // Create deposit instruction for each token
-  for (const [mint, amount] of Object.entries(amounts)) {
-    if (!amount || amount <= 0) continue
-    
+  const depositDetails = Object.entries(amounts).map(([mint, amount]) => {
     const token = tokens.find(t => t.mint === mint)
-    if (!token) {
-      console.warn(`Token not found for mint: ${mint}`)
-      continue
+    return {
+      token: token?.symbol || 'Unknown',
+      amount,
+      mint,
     }
-    
-    // SOL is native, need to handle differently (convert to wrapped SOL first or skip)
-    if (token.symbol === 'SOL') {
-      console.log('Skipping SOL deposit - native SOL not yet supported, needs wrapping to WSOL first')
-      continue
-    }
-    
-    try {
-      const { instruction } = await createDepositInstruction(
-        connection,
-        publicKey,
-        mint,
-        amount,
-        token.decimals || 6
-      )
-      
-      instructions.push(instruction)
-      depositDetails.push({
-        token: token.symbol,
-        amount,
-        mint,
-      })
-    } catch (error) {
-      console.error(`Error creating deposit instruction for ${token.symbol}:`, error)
-      throw new Error(`Failed to create deposit for ${token.symbol}: ${error.message}`)
-    }
-  }
+  })
+  
+  console.log('Deposit details:', depositDetails)
   
   if (instructions.length === 0) {
     throw new Error('No valid deposits to submit')
   }
   
-  console.log(`Created ${instructions.length} deposit instruction(s)`)
+  console.log('Creating deposit_multi transaction')
   
-  // Warn if some tokens were skipped
-  if (Object.keys(amounts).length > instructions.length) {
-    console.warn('Some tokens were skipped (SOL not supported yet)')
-  }
-  
-  if (instructions.length === 0) {
-    throw new Error('No valid deposits to submit')
-  }
-  
-  console.log('Creating transaction with', instructions.length, 'instructions')
+  // Create single multi-token deposit instruction
+  const { instruction, tokenCount } = await createDepositMultiInstruction(
+    connection,
+    publicKey,
+    amounts,
+    tokens
+  )
   
   // Get latest blockhash
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash()
   
-  // Create transaction with instructions
+  // Create transaction
   const transaction = new Transaction()
   transaction.feePayer = publicKey
   transaction.recentBlockhash = blockhash
   transaction.lastValidBlockHeight = lastValidBlockHeight
   
-  // Add all instructions
-  instructions.forEach(ix => transaction.add(ix))
+  // Add the multi-deposit instruction
+  transaction.add(instruction)
   
   console.log('Transaction created:')
   console.log('- Instructions:', transaction.instructions.length)
