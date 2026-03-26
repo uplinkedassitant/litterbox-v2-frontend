@@ -45,12 +45,37 @@ export async function fetchUserBalances(connection, walletAddress) {
       balanceUi: 0,
     }));
 
+    // Get native SOL balance separately
+    const solBalance = await connection.getBalance(walletPubkey);
+    const solLamports = solBalance; // 1 SOL = 1e9 lamports
+    const solUi = solBalance / 1e9;
+    
+    console.log('Native SOL balance:', {
+      lamports: solLamports,
+      sol: solUi,
+    });
+    
+    // Set SOL balance if user has native SOL
+    if (solUi > 0) {
+      const solIndex = balances.findIndex(b => b.symbol === 'SOL');
+      if (solIndex !== -1) {
+        balances[solIndex].balance = solLamports.toString();
+        balances[solIndex].balanceUi = solUi;
+      }
+    }
+
     // Process each token account
     tokenAccounts.value.forEach((account) => {
       try {
         const parsedInfo = account.account.data.parsed.info;
         const mintAddress = parsedInfo.mint;
         const tokenAmount = parsedInfo.tokenAmount;
+        
+        console.log('Token account:', {
+          mint: mintAddress,
+          amount: tokenAmount.amount,
+          uiAmount: tokenAmount.uiAmount,
+        });
         
         // Find matching token in our supported list
         const tokenIndex = balances.findIndex(
