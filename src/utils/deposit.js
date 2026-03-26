@@ -205,8 +205,14 @@ export async function submitDeposit(
     'confirmed'
   )
   
+  console.log('Confirmation result:', confirmation)
+  
   if (confirmation.value.err) {
-    throw new Error(`Transaction failed: ${confirmation.value.err}`)
+    console.error('Transaction error details:', confirmation.value.err)
+    const errorMsg = typeof confirmation.value.err === 'object' 
+      ? JSON.stringify(confirmation.value.err) 
+      : confirmation.value.err.toString()
+    throw new Error(`Transaction failed: ${errorMsg}`)
   }
   
   console.log('✅ Deposit successful!', {
