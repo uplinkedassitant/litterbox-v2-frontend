@@ -14,12 +14,12 @@ const PROGRAM_ID = new PublicKey('B3j1f4KLqEGq1VFnec5WUxg7ePMh9KFBPFBFnjDDpMvr')
  */
 export function getProgramAddresses() {
   const [configPDA] = PublicKey.findProgramAddressSync(
-    Buffer.from('config'),
+    new TextEncoder().encode('config'),
     PROGRAM_ID
   );
   
   const [poolPDA] = PublicKey.findProgramAddressSync(
-    Buffer.from('pool'),
+    new TextEncoder().encode('pool'),
     PROGRAM_ID
   );
   
@@ -55,8 +55,16 @@ export async function fetchPoolStats(connection) {
     
     // Parse pool account data
     // Note: Adjust offsets based on your actual program structure
-    const poolData = new DataView(poolAccount.data.buffer);
-    const configData = new DataView(configAccount.data.buffer);
+    const poolData = new DataView(
+      poolAccount.data.buffer,
+      poolAccount.data.byteOffset,
+      poolAccount.data.byteLength
+    );
+    const configData = new DataView(
+      configAccount.data.buffer,
+      configAccount.data.byteOffset,
+      configAccount.data.byteLength
+    );
     
     // Extract values (assuming standard layout)
     // Adjust these offsets based on your program's actual account structure
