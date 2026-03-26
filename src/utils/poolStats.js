@@ -35,6 +35,10 @@ export async function fetchPoolStats(connection) {
   try {
     const { configPDA, poolPDA } = getProgramAddresses();
     
+    console.log('Fetching pool stats...');
+    console.log('Config PDA:', configPDA.toString());
+    console.log('Pool PDA:', poolPDA.toString());
+    
     // Fetch account info
     const [poolAccount, configAccount] = await Promise.all([
       connection.getAccountInfo(poolPDA),
@@ -44,6 +48,8 @@ export async function fetchPoolStats(connection) {
     // If accounts don't exist yet, return defaults
     if (!poolAccount || !configAccount) {
       console.log('Program accounts not found, using defaults');
+      if (!poolAccount) console.log('⚠️ Pool account not found');
+      if (!configAccount) console.log('⚠️ Config account not found');
       return {
         totalLiquidity: 0,
         totalLitterMinted: 0,
@@ -53,34 +59,53 @@ export async function fetchPoolStats(connection) {
       };
     }
     
+    console.log('✅ Pool account found:', {
+      lamports: poolAccount.lamports,
+      dataLength: poolAccount.data.length,
+      owner: poolAccount.owner.toString(),
+    });
+    
+    console.log('✅ Config account found:', {
+      lamports: configAccount.lamports,
+      dataLength: configAccount.data.length,
+      owner: configAccount.owner.toString(),
+    });
+    
+    // Debug: Show first 100 bytes of data
+    console.log('Pool data (first 100 bytes):', 
+      Array.from(poolAccount.data.slice(0, 100)).map(b => 
+        b.toString(16).padStart(2, '0')
+      ).join(' ')
+    );
+    
     // Parse pool account data
-    // Note: Adjust offsets based on your actual program structure
     const poolData = new DataView(
       poolAccount.data.buffer,
       poolAccount.data.byteOffset,
       poolAccount.data.byteLength
     );
-    const configData = new DataView(
-      configAccount.data.buffer,
-      configAccount.data.byteOffset,
-      configAccount.data.byteLength
-    );
     
-    // Extract values (assuming standard layout)
-    // Adjust these offsets based on your program's actual account structure
-    const totalLiquidity = poolData.getBigUint64(0, true); // Offset 0, little-endian
-    const totalLitterMinted = poolData.getBigUint64(8, true); // Offset 8
-    const activeUsers = poolData.getBigUint64(16, true); // Offset 16
+    // Extract values - try different offsets based on common patterns
+    // Pattern 1: Standard u64 fields
+    const totalLiquidity = poolData.getBigUint64(0, true);
+    const totalLitterMinted = poolData.getBigUint64(8, true);
+    const activeUsers = poolData.getBigUint64(16, true);
+    
+    console.log('Parsed values:', {
+      totalLiquidity: totalLiquidity.toString(),
+      totalLitterMinted: totalLitterMinted.toString(),
+      activeUsers: activeUsers.toString(),
+    });
     
     return {
-      totalLiquidity: Number(totalLiquidity) / 1_000_000, // Convert from micro-units
+      totalLiquidity: Number(totalLiquidity) / 1_000_000,
       totalLitterMinted: Number(totalLitterMinted) / 1_000_000,
       activeUsers: Number(activeUsers),
-      tokensRecycled: Number(activeUsers) * 2.5, // Placeholder calculation
+      tokensRecycled: Number(activeUsers) * 2.5,
       isLoading: false,
     };
   } catch (error) {
-    console.error('Error fetching pool stats:', error);
+    console.error('❌ Error fetching pool stats:', error);
     return {
       totalLiquidity: 0,
       totalLitterMinted: 0,
