@@ -179,8 +179,8 @@ export async function submitDeposit(
   let signature
   try {
     const result = await sendTransaction(transaction, connection, { skipPreflight: true })
-    signature = result.value
-    console.log('Transaction sent, waiting for confirmation...')
+    signature = result
+    console.log('Transaction sent with signature:', signature)
   } catch (error) {
     console.error('sendTransaction error:', error)
     console.error('Error name:', error.name)
@@ -188,11 +188,22 @@ export async function submitDeposit(
     throw error
   }
   
-  console.log('Transaction sent:', signature)
+  if (!signature) {
+    throw new Error('No signature returned from sendTransaction')
+  }
+  
   console.log('Waiting for confirmation...')
   
-  // Wait for confirmation
-  const confirmation = await connection.confirmTransaction(signature, 'confirmed')
+  // Wait for confirmation using the connection directly
+  const latestBlockhash = await connection.getLatestBlockhash()
+  const confirmation = await connection.confirmTransaction(
+    {
+      signature,
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+    },
+    'confirmed'
+  )
   
   if (confirmation.value.err) {
     throw new Error(`Transaction failed: ${confirmation.value.err}`)
