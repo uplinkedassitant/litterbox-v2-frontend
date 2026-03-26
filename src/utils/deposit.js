@@ -148,11 +148,6 @@ export async function submitDeposit(
   })
   
   console.log('Deposit details:', depositDetails)
-  
-  if (instructions.length === 0) {
-    throw new Error('No valid deposits to submit')
-  }
-  
   console.log('Creating deposit_multi transaction')
   
   // Create single multi-token deposit instruction
