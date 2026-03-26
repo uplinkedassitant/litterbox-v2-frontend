@@ -63,9 +63,14 @@ async function createDepositInstruction(
   
   // Create deposit instruction data
   // Format: [discriminator (1 byte), amount (8 bytes)]
-  const data = Buffer.alloc(9);
-  data.writeUInt8(DISC_DEPOSIT, 0);
-  data.writeBigUInt64LE(BigInt(Math.floor(amount * Math.pow(10, tokenDecimals))), 1);
+  // Use Uint8Array instead of Buffer for browser compatibility
+  const data = new Uint8Array(9);
+  data[0] = DISC_DEPOSIT;
+  // Write u64 little-endian
+  const amountBN = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
+  for (let i = 0; i < 8; i++) {
+    data[i + 1] = Number((amountBN >> (8n * BigInt(i))) & 0xFFn);
+  }
   
   // Create the instruction
   const keys = [
