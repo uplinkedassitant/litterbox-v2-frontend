@@ -1,29 +1,22 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { ConnectionProvider, WalletProvider, useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { Wallet as WalletIcon, TrendingUp, Coins, CheckCircle, RefreshCw } from 'lucide-react'
 import { clusterApiUrl } from '@solana/web3.js'
+import { fetchPoolStats } from './utils/poolStats'
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
 // Configuration - Use official Solana clusterApiUrl for Devnet
 const RPC_URL = clusterApiUrl('devnet')
 
-// Mock data for now
-const MOCK_POOL_DATA = {
-  totalLiquidity: 1234.56,
-  totalLitterMinted: 5678.90,
-  activeUsers: 42,
-  tokensRecycled: 105,
-}
-
 // Pool Stats Component
-function PoolStats() {
+function PoolStats({ poolData, isLoading, error }) {
   const stats = [
-    { label: 'Total Liquidity', value: `$${MOCK_POOL_DATA.totalLiquidity.toLocaleString()}`, icon: TrendingUp },
-    { label: 'Litter Minted', value: MOCK_POOL_DATA.totalLitterMinted.toLocaleString(), icon: Coins },
-    { label: 'Active Users', value: MOCK_POOL_DATA.activeUsers.toString(), icon: CheckCircle },
-    { label: 'Tokens Recycled', value: MOCK_POOL_DATA.tokensRecycled.toString(), icon: RefreshCw },
+    { label: 'Total Liquidity', value: `$${(poolData.totalLiquidity || 0).toLocaleString()}`, icon: TrendingUp },
+    { label: 'Litter Minted', value: (poolData.totalLitterMinted || 0).toLocaleString(), icon: Coins },
+    { label: 'Active Users', value: (poolData.activeUsers || 0).toString(), icon: CheckCircle },
+    { label: 'Tokens Recycled', value: (poolData.tokensRecycled || 0).toString(), icon: RefreshCw },
   ]
 
   return (
@@ -35,8 +28,11 @@ function PoolStats() {
               <stat.icon className="w-6 h-6 text-primary-600" />
             </div>
           </div>
-          <div className="text-2xl font-bold text-gray-800 mb-1">{stat.value}</div>
+          <div className="text-2xl font-bold text-gray-800 mb-1">
+            {isLoading ? 'Loading...' : stat.value}
+          </div>
           <div className="text-sm text-gray-500">{stat.label}</div>
+          {error && <div className="text-xs text-red-500 mt-2">{error}</div>}
         </div>
       ))}
     </div>
@@ -62,6 +58,37 @@ function ConnectedContent({ publicKey }) {
 // Main App Content (uses wallet hooks)
 function AppContent() {
   const { connected, publicKey } = useWallet()
+  const { connection } = useConnection()
+  const [poolData, setPoolData] = useState({
+    totalLiquidity: 0,
+    totalLitterMinted: 0,
+    activeUsers: 0,
+    tokensRecycled: 0,
+  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  // Fetch pool stats on mount
+  useEffect(() => {
+    const loadPoolStats = async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        const stats = await fetchPoolStats(connection)
+        setPoolData(stats)
+        if (stats.error) {
+          setError(stats.error)
+        }
+      } catch (err) {
+        console.error('Error loading pool stats:', err)
+        setError('Failed to load pool statistics')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadPoolStats()
+  }, [connection])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -82,7 +109,7 @@ function AppContent() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Pool Stats - Always visible */}
-        <PoolStats />
+        <PoolStats poolData={poolData} isLoading={isLoading} error={error} />
 
         {/* Wallet Connection State */}
         {!connected ? (
