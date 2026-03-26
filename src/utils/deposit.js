@@ -73,17 +73,11 @@ async function createDepositInstruction(
   }
   
   // Create the instruction
+  // Backend expects only 3 accounts: user, config, pool
   const keys = [
     { pubkey: userPubkey, isSigner: true, isWritable: true },
     { pubkey: CONFIG_ACCOUNT, isSigner: false, isWritable: true },
     { pubkey: POOL_ACCOUNT, isSigner: false, isWritable: true },
-    { pubkey: userTokenAccount, isSigner: false, isWritable: true },
-    { pubkey: poolTokenAccount, isSigner: false, isWritable: true },
-    { pubkey: userLitterAccount, isSigner: false, isWritable: true },
-    { pubkey: poolLitterAccount, isSigner: false, isWritable: true },
-    { pubkey: LITTER_MINT, isSigner: false, isWritable: false },
-    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
   ];
   
   const instruction = new TransactionInstruction({
