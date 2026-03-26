@@ -3,7 +3,7 @@
  * Connects frontend to the actual Solana program
  */
 
-import { PublicKey, Connection, Transaction, SystemProgram } from '@solana/web3.js';
+import { PublicKey, Connection } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID, getAccount, getMint } from '@solana/spl-token';
 
 // Program configuration
@@ -15,13 +15,8 @@ export const LITTER_MINT = new PublicKey(
   import.meta.env.VITE_LITTER_MINT || 'FXyF4rttJ15yP9tBMdW24GchihjsnqZ1aqMsQvGPqbSR'
 );
 
-// Discriminators
-const DISC_INITIALIZE = 0;
-const DISC_DEPOSIT = 1;
-const DISC_WITHDRAW = 2;
-const DISC_SWEEP = 3;
-const DISC_GRADUATE = 4;
-const DISC_DEPOSIT_MULTI = 5;
+// These will be used when we implement actual transactions
+// const DISC_DEPOSIT = 1;
 
 /**
  * Get program-derived addresses (PDAs)
@@ -146,73 +141,14 @@ function getTokenSymbol(mintAddress) {
 }
 
 /**
- * Create deposit instruction
+ * Create deposit instruction (placeholder - to be implemented)
+ * This will be implemented when we add actual transaction submission
  */
-export async function createDepositInstruction(
-  connection,
-  wallet,
-  tokenAmount,
-  tokenMint
-) {
-  const { configPDA, poolPDA } = getProgramAddresses();
-  
-  // Get user's token account
-  const userTokenAccount = await connection.getTokenAccountsByOwner(wallet.publicKey, {
-    mint: new PublicKey(tokenMint),
-  });
-  
-  if (userTokenAccount.value.length === 0) {
-    throw new Error('No token account found for this token');
-  }
-  
-  const userTokenPubkey = userTokenAccount.value[0].pubkey;
-  
-  // Get or create Litter token account
-  const litterTokenAccount = await connection.getTokenAccountsByOwner(wallet.publicKey, {
-    mint: LITTER_MINT,
-  });
-  
-  let userLitterAccount;
-  if (litterTokenAccount.value.length === 0) {
-    // Need to create Litter token account
-    userLitterAccount = await createTokenAccountInstruction(
-      connection,
-      wallet.publicKey,
-      LITTER_MINT
-    );
-  } else {
-    userLitterAccount = litterTokenAccount.value[0].pubkey;
-  }
-  
-  // Create deposit instruction data
-  const data = Buffer.alloc(9);
-  data[0] = DISC_DEPOSIT;
-  data.writeBigUint64LE(BigInt(Math.floor(tokenAmount * 1_000_000)), 1); // Assuming 6 decimals
-  
-  // Build instruction
-  const depositIx = new Transaction().add({
-    keys: [
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-      { pubkey: configPDA, isSigner: false, isWritable: true },
-      { pubkey: poolPDA, isSigner: false, isWritable: true },
-      { pubkey: userTokenPubkey, isSigner: false, isWritable: true },
-      { pubkey: userLitterAccount, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    ],
-    data: data,
-    programId: PROGRAM_ID,
-  });
-  
-  return depositIx;
-}
-
-/**
- * Helper to create token account
- */
-async function createTokenAccountInstruction(connection, owner, mint) {
-  // This would create an associated token account
-  // Simplified for now - you'd use @solana/spl-token library
-  throw new Error('Token account creation not implemented');
+export async function createDepositInstruction(connection, wallet, tokenAmount, tokenMint) {
+  console.log('Deposit instruction placeholder - to be implemented');
+  console.log('Amount:', tokenAmount, 'Token:', tokenMint);
+  // TODO: Implement actual deposit transaction
+  throw new Error('Deposit transaction not yet implemented');
 }
 
 /**
