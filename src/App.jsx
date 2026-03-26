@@ -164,6 +164,21 @@ function AppContent() {
   // Handle deposit
   const handleDeposit = async (amounts) => {
     console.log('Submitting deposit:', amounts)
+    console.log('Wallet object:', wallet)
+    console.log('Wallet publicKey:', wallet?.publicKey)
+    console.log('Connection RPC:', connection?.rpcEndpoint)
+    
+    // Check wallet state
+    if (!wallet) {
+      throw new Error('Wallet adapter not initialized')
+    }
+    
+    if (!wallet.publicKey) {
+      throw new Error('Wallet not connected - no publicKey')
+    }
+    
+    console.log('Proceeding with deposit for publicKey:', wallet.publicKey.toString())
+    
     const result = await submitDeposit(connection, wallet, amounts, userBalances)
     console.log('✅ Deposit successful!', result)
     
