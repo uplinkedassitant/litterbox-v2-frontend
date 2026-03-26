@@ -127,7 +127,16 @@ export async function submitDeposit(
     if (!amount || amount <= 0) continue
     
     const token = tokens.find(t => t.mint === mint)
-    if (!token) continue
+    if (!token) {
+      console.warn(`Token not found for mint: ${mint}`)
+      continue
+    }
+    
+    // SOL is native, need to handle differently (convert to wrapped SOL first or skip)
+    if (token.symbol === 'SOL') {
+      console.log('Skipping SOL deposit - native SOL not yet supported, needs wrapping to WSOL first')
+      continue
+    }
     
     try {
       const { instruction } = await createDepositInstruction(
@@ -148,6 +157,10 @@ export async function submitDeposit(
       console.error(`Error creating deposit instruction for ${token.symbol}:`, error)
       throw new Error(`Failed to create deposit for ${token.symbol}: ${error.message}`)
     }
+  }
+  
+  if (instructions.length === 0) {
+    throw new Error('No valid deposits to submit (SOL needs to be wrapped to WSOL first)')
   }
   
   if (instructions.length === 0) {

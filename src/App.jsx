@@ -191,9 +191,19 @@ function AppContent() {
       const result = await submitDeposit(connection, publicKey, amounts, userBalances, sendTransaction)
       console.log('✅ Deposit successful!', result)
       
-      // Refresh pool stats
+      // Wait a moment for the network to update, then refresh pool stats
+      console.log('Waiting 2 seconds for network to update...')
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      console.log('Refreshing pool stats...')
       const stats = await fetchPoolStats(connection)
+      console.log('New pool stats:', stats)
       setPoolData(stats)
+      
+      // Also refresh user balances
+      console.log('Refreshing user balances...')
+      const balances = await fetchUserBalances(connection, publicKey.toString())
+      setUserBalances(balances)
       
       return result
     } catch (error) {
