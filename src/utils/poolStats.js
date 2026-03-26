@@ -9,28 +9,20 @@ import { PublicKey, Connection } from '@solana/web3.js';
 
 const PROGRAM_ID = new PublicKey('B3j1f4KLqEGq1VFnec5WUxg7ePMh9KFBPFBFnjDDpMvr');
 
+// Account addresses from .litterbox-config.json
+// These are simple keypairs created during initialization (not PDAs)
+const CONFIG_ACCOUNT = new PublicKey('6z5WTnmMeiu1E68nxHSSnkyUgrzLWJvSvxdBJx59HG2a');
+const POOL_ACCOUNT = new PublicKey('Gz6sd1RT2xFt7QxfNrR7pEpxvqPkqTUV4GKLxZ7XnTMu');
+
 /**
- * Get program-derived addresses (PDAs)
- * Based on litterbox-pinocchio program constants:
- * - CONFIG_SEED = "config"
- * - VIRTUAL_POOL_SEED = "virtual_pool"
+ * Get program account addresses
+ * Note: Program uses simple keypair accounts (not PDAs) for Config and Pool
  */
 export function getProgramAddresses() {
-  // Seeds must be an array of Uint8Arrays
-  const configSeed = [new TextEncoder().encode('config')];
-  const poolSeed = [new TextEncoder().encode('virtual_pool')];
-  
-  const [configPDA] = PublicKey.findProgramAddressSync(
-    configSeed,
-    PROGRAM_ID
-  );
-  
-  const [poolPDA] = PublicKey.findProgramAddressSync(
-    poolSeed,
-    PROGRAM_ID
-  );
-  
-  return { configPDA, poolPDA };
+  return { 
+    configPDA: CONFIG_ACCOUNT,
+    poolPDA: POOL_ACCOUNT 
+  };
 }
 
 /**
