@@ -11,6 +11,9 @@ import { submitDeposit } from './utils/deposit'
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
+// RPC URL for Solana Devnet
+const RPC_URL = clusterApiUrl('devnet')
+
 // Pool Stats Component
 function PoolStats({ poolData, isLoading, error }) {
   const formatNumber = (num) => {
