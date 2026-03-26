@@ -7,8 +7,9 @@ import { PublicKey } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
 // Supported tokens
+// Note: Using official Devnet USDC from Circle
 export const SUPPORTED_TOKENS = [
-  { symbol: 'USDC', mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', name: 'USD Coin', icon: '💵' },
+  { symbol: 'USDC', mint: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', name: 'USD Coin', icon: '💵' },
   { symbol: 'SOL', mint: 'So11111111111111111111111111111111111111112', name: 'Wrapped SOL', icon: '◎' },
   { symbol: 'BONK', mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263', name: 'Bonk', icon: '🐕' },
   { symbol: 'WIF', mint: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm', name: 'dogwifhat', icon: '🎩' },
