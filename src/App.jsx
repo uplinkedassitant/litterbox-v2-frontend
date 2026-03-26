@@ -12,11 +12,19 @@ const RPC_URL = clusterApiUrl('devnet')
 
 // Pool Stats Component
 function PoolStats({ poolData, isLoading, error }) {
+  // Format numbers nicely
+  const formatNumber = (num) => {
+    if (!num || num === 0) return '0';
+    // If it's a large number, assume it's in micro-units and divide
+    const value = num > 10000 ? num / 1_000_000 : num;
+    return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  };
+
   const stats = [
-    { label: 'Total Liquidity', value: `$${(poolData.totalLiquidity || 0).toLocaleString()}`, icon: TrendingUp },
-    { label: 'Litter Minted', value: (poolData.totalLitterMinted || 0).toLocaleString(), icon: Coins },
+    { label: 'Total Liquidity', value: `$${formatNumber(poolData.totalLiquidity || 0)}`, icon: TrendingUp },
+    { label: 'Litter Minted', value: `${formatNumber(poolData.totalLitterMinted || 0)} LITTER`, icon: Coins },
     { label: 'Active Users', value: (poolData.activeUsers || 0).toString(), icon: CheckCircle },
-    { label: 'Tokens Recycled', value: (poolData.tokensRecycled || 0).toString(), icon: RefreshCw },
+    { label: 'Tokens Recycled', value: `${formatNumber(poolData.tokensRecycled || 0)}`, icon: RefreshCw },
   ]
 
   return (
