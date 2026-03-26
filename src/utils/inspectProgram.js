@@ -54,8 +54,10 @@ export async function inspectProgramAccounts() {
   
   for (const seeds of seedPatterns) {
     try {
+      // Convert string seeds to array of Uint8Arrays
+      const seedBytes = seeds.map(s => new TextEncoder().encode(s));
       const [pda, bump] = PublicKey.findProgramAddressSync(
-        seeds.map(s => new TextEncoder().encode(s)),
+        seedBytes,
         PROGRAM_ID
       );
       

@@ -13,13 +13,17 @@ const PROGRAM_ID = new PublicKey('B3j1f4KLqEGq1VFnec5WUxg7ePMh9KFBPFBFnjDDpMvr')
  * Get program-derived addresses (PDAs)
  */
 export function getProgramAddresses() {
+  // Seeds must be an array of Uint8Arrays
+  const configSeed = [new TextEncoder().encode('config')];
+  const poolSeed = [new TextEncoder().encode('pool')];
+  
   const [configPDA] = PublicKey.findProgramAddressSync(
-    new TextEncoder().encode('config'),
+    configSeed,
     PROGRAM_ID
   );
   
   const [poolPDA] = PublicKey.findProgramAddressSync(
-    new TextEncoder().encode('pool'),
+    poolSeed,
     PROGRAM_ID
   );
   
