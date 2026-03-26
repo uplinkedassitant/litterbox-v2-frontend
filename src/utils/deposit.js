@@ -62,14 +62,23 @@ async function createDepositInstruction(
   );
   
   // Create deposit instruction data
-  // Format: [discriminator (1 byte), amount (8 bytes)]
+  // Format: [discriminator (1 byte), usdc_amount (8 bytes), min_litter_out (8 bytes)]
+  // Total: 17 bytes
   // Use Uint8Array instead of Buffer for browser compatibility
-  const data = new Uint8Array(9);
+  const data = new Uint8Array(17);
   data[0] = DISC_DEPOSIT;
-  // Write u64 little-endian
-  const amountBN = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
+  
+  // Write usdc_amount as u64 little-endian (bytes 1-8)
+  const usdcAmountBN = BigInt(Math.floor(amount * Math.pow(10, tokenDecimals)));
   for (let i = 0; i < 8; i++) {
-    data[i + 1] = Number((amountBN >> (8n * BigInt(i))) & 0xFFn);
+    data[i + 1] = Number((usdcAmountBN >> (8n * BigInt(i))) & 0xFFn);
+  }
+  
+  // Write min_litter_out as u64 little-endian (bytes 9-16)
+  // Set to 0 for no minimum (or calculate based on slippage tolerance)
+  const minLitterOut = 0n;
+  for (let i = 0; i < 8; i++) {
+    data[i + 9] = Number((minLitterOut >> (8n * BigInt(i))) & 0xFFn);
   }
   
   // Create the instruction
