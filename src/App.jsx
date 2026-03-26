@@ -1,17 +1,12 @@
 import { useState, useEffect } from 'react'
 import { ConnectionProvider, WalletProvider, useWallet, useConnection } from '@solana/wallet-adapter-react'
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui'
-import { Connection, PublicKey } from '@solana/web3.js'
-import { List, RefreshCw, TrendingUp, Info, ArrowRight, CheckCircle, AlertCircle, Coins, Wallet as WalletIcon } from 'lucide-react'
+import { List, RefreshCw, TrendingUp, ArrowRight, CheckCircle, AlertCircle, Coins, Wallet as WalletIcon } from 'lucide-react'
 import { fetchPoolStats, fetchTokenBalances, calculateLitterForDeposit } from './utils/litterboxProgram'
-import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
 // Configuration
 const CONFIG = {
-  PROGRAM_ID: new PublicKey(import.meta.env.VITE_PROGRAM_ID || 'B3j1f4KLqEGq1VFnec5WUxg7ePMh9KFBPFBFnjDDpMvr'),
-  LITTER_MINT: new PublicKey(import.meta.env.VITE_LITTER_MINT || 'FXyF4rttJ15yP9tBMdW24GchihjsnqZ1aqMsQvGPqbSR'),
-  NETWORK: 'devnet',
   RPC_URL: import.meta.env.VITE_RPC_URL || 'https://api.devnet.solana.com',
 }
 
@@ -24,8 +19,8 @@ const SUPPORTED_TOKENS = [
   { symbol: 'POPCAT', mint: '7GCihgDB8fe6KNjn2MYtkzZcRj3y3t9GHdA8N7yWa2BA', name: 'Popcat', icon: '🐱' },
 ]
 
-// Pool Stats Component with real data
-function PoolStats({ poolData, isLoading, error }) {
+// Pool Stats Component
+function PoolStats({ poolData, isLoading }) {
   const stats = [
     { label: 'Total Liquidity', value: `$${poolData.totalLiquidity?.toLocaleString() || '0'}`, icon: TrendingUp, change: '+12.5%' },
     { label: 'Litter Minted', value: `${poolData.totalLitterMinted?.toLocaleString() || '0'}`, icon: Coins, change: '+8.2%' },
@@ -57,7 +52,7 @@ function PoolStats({ poolData, isLoading, error }) {
   )
 }
 
-// Token Selector with real balances
+// Token Selector Component
 function TokenSelector({ selectedTokens, onSelectToken, userBalances, isLoading }) {
   const [searchTerm, setSearchTerm] = useState('')
   
@@ -123,7 +118,7 @@ function TokenSelector({ selectedTokens, onSelectToken, userBalances, isLoading 
   )
 }
 
-// Deposit Form with real calculations
+// Deposit Form Component
 function DepositForm({ selectedTokens, onDeposit, poolData }) {
   const [amounts, setAmounts] = useState({})
   const [isProcessing, setIsProcessing] = useState(false)
@@ -219,21 +214,12 @@ function DepositForm({ selectedTokens, onDeposit, poolData }) {
   )
 }
 
-// Main App Component
-function App() {
-  const { connected, wallet, connect } = useWallet()
+// Main Content Component (uses wallet hooks)
+function MainContent({ poolData, setPoolData, isLoading, setIsLoading }) {
+  const { connected, wallet } = useWallet()
   const { connection } = useConnection()
-  
-  const [poolData, setPoolData] = useState({
-    totalLiquidity: 0,
-    totalLitterMinted: 0,
-    activeUsers: 0,
-    tokensRecycled: 0,
-  })
   const [userBalances, setUserBalances] = useState([])
   const [selectedTokens, setSelectedTokens] = useState([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState(null)
 
   // Fetch pool stats on mount
   useEffect(() => {
@@ -244,14 +230,12 @@ function App() {
         setPoolData(stats)
       } catch (err) {
         console.error('Error loading pool stats:', err)
-        setError('Failed to load pool statistics')
       } finally {
         setIsLoading(false)
       }
     }
-
     loadPoolStats()
-  }, [connection])
+  }, [connection, setPoolData, setIsLoading])
 
   // Fetch user balances when wallet connects
   useEffect(() => {
@@ -268,7 +252,6 @@ function App() {
         console.error('Error loading balances:', err)
       }
     }
-
     loadBalances()
   }, [connected, wallet, connection])
 
@@ -281,91 +264,94 @@ function App() {
   }
 
   const handleDeposit = async (amounts) => {
-    // TODO: Implement actual deposit transaction
     console.log('Depositing:', amounts)
-    alert('Deposit functionality coming soon! This will integrate with the actual program.')
+    alert('Deposit functionality coming soon!')
   }
 
   return (
-    <ConnectionProvider config={{ endpoint: CONFIG.RPC_URL }}>
-      <WalletProvider wallets={[]} autoConnect>
-        <WalletModalProvider>
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-            {/* Header */}
-            <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
-              <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="text-3xl">♻️</div>
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-800">LitterBox v2</h1>
-                    <p className="text-sm text-gray-500">Meme Token Recycler</p>
-                  </div>
-                </div>
-                <WalletMultiButton />
-              </div>
-            </header>
+    <>
+      <PoolStats poolData={poolData} isLoading={isLoading} />
+      
+      {!connected ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">👋</div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-4">
+            Connect Your Wallet to Start
+          </h2>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">
+            Connect your Solana wallet to view your tokens and start recycling meme tokens
+          </p>
+          <WalletMultiButton />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <TokenSelector
+            selectedTokens={selectedTokens}
+            onSelectToken={handleSelectToken}
+            userBalances={userBalances}
+            isLoading={isLoading}
+          />
+          
+          {selectedTokens.length > 0 && (
+            <DepositForm
+              selectedTokens={selectedTokens}
+              onDeposit={handleDeposit}
+              poolData={poolData}
+            />
+          )}
+        </div>
+      )}
+    </>
+  )
+}
 
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-4 py-8">
-              {/* Pool Statistics */}
-              <PoolStats 
-                poolData={poolData} 
-                isLoading={isLoading} 
-                error={error} 
-              />
+// App Component (provides context)
+function App() {
+  const [poolData, setPoolData] = useState({
+    totalLiquidity: 0,
+    totalLitterMinted: 0,
+    activeUsers: 0,
+    tokensRecycled: 0,
+  })
+  const [isLoading, setIsLoading] = useState(false)
 
-              {!connected ? (
-                // Connect Wallet State
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">👋</div>
-                  <h2 className="text-3xl font-bold text-gray-800 mb-4">
-                    Connect Your Wallet to Start
-                  </h2>
-                  <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                    Connect your Solana wallet to view your tokens and start recycling meme tokens
-                  </p>
-                  <button
-                    onClick={connect}
-                    className="bg-gradient-to-r from-primary-600 to-primary-800 text-white px-8 py-4 rounded-lg font-semibold hover:from-primary-700 hover:to-primary-900 transition-all"
-                  >
-                    Connect Wallet
-                  </button>
-                </div>
-              ) : (
-                // Main Interface
-                <div className="space-y-6">
-                  <TokenSelector
-                    selectedTokens={selectedTokens}
-                    onSelectToken={handleSelectToken}
-                    userBalances={userBalances}
-                    isLoading={isLoading}
-                  />
-                  
-                  {selectedTokens.length > 0 && (
-                    <DepositForm
-                      selectedTokens={selectedTokens}
-                      onDeposit={handleDeposit}
-                      poolData={poolData}
-                    />
-                  )}
-                </div>
-              )}
-
-              {/* How It Works */}
-              <HowItWorks />
-            </main>
-
-            {/* Footer */}
-            <footer className="bg-white border-t border-gray-100 mt-12 py-6">
-              <div className="max-w-7xl mx-auto px-4 text-center text-gray-500 text-sm">
-                <p>♻️ LitterBox v2 - Built on Solana</p>
-                <p className="mt-2">Don't let your meme tokens go to waste - recycle them!</p>
-              </div>
-            </footer>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="text-3xl">♻️</div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">LitterBox v2</h1>
+              <p className="text-sm text-gray-500">Meme Token Recycler</p>
+            </div>
           </div>
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+          <WalletMultiButton />
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-8">
+        <MainContent 
+          poolData={poolData} 
+          setPoolData={setPoolData}
+          isLoading={isLoading}
+          setIsLoading={setIsLoading}
+        />
+
+        {/* How It Works */}
+        <HowItWorks />
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-gray-100 mt-12 py-6">
+        <div className="max-w-7xl mx-auto px-4 text-center text-gray-500 text-sm">
+          <p>♻️ LitterBox v2 - Built on Solana</p>
+          <p className="mt-2">Don't let your meme tokens go to waste - recycle them!</p>
+        </div>
+      </footer>
+    </div>
   )
 }
 
@@ -396,4 +382,21 @@ const HowItWorks = () => {
   )
 }
 
-export default App
+// Root component with providers
+function AppWithProviders() {
+  const endpoint = CONFIG.RPC_URL
+
+  const wallets = [] // Wallets will be auto-detected by WalletModalProvider
+
+  return (
+    <ConnectionProvider config={{ endpoint }}>
+      <WalletProvider wallets={wallets} autoConnect>
+        <WalletModalProvider>
+          <App />
+        </WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
+  )
+}
+
+export default AppWithProvider
