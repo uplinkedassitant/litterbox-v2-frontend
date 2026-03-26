@@ -4,6 +4,7 @@ import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-r
 import { Wallet as WalletIcon, TrendingUp, Coins, CheckCircle, RefreshCw } from 'lucide-react'
 import { clusterApiUrl } from '@solana/web3.js'
 import { fetchPoolStats } from './utils/poolStats'
+import { fetchUserBalances, SUPPORTED_TOKENS } from './utils/userBalances'
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
@@ -48,17 +49,52 @@ function PoolStats({ poolData, isLoading, error }) {
 }
 
 // Wallet Content - shown when wallet is connected
-function ConnectedContent({ publicKey }) {
+function ConnectedContent({ publicKey, userBalances, isLoading }) {
   return (
-    <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 text-center">
-      <div className="text-6xl mb-4">✅</div>
-      <h3 className="text-2xl font-bold text-green-800 mb-2">Wallet Connected!</h3>
-      <p className="text-green-700 mb-4">
-        Connected to: <strong>{publicKey?.toString().slice(0, 4)}...{publicKey?.toString().slice(-4)}</strong>
-      </p>
-      <p className="text-green-600 text-sm">
-        Token balances and deposit form coming in next phase!
-      </p>
+    <div className="space-y-6">
+      <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 text-center">
+        <div className="text-6xl mb-4">✅</div>
+        <h3 className="text-2xl font-bold text-green-800 mb-2">Wallet Connected!</h3>
+        <p className="text-green-700 mb-4">
+          Connected to: <strong>{publicKey?.toString().slice(0, 4)}...{publicKey?.toString().slice(-4)}</strong>
+        </p>
+      </div>
+
+      {/* Token Balances */}
+      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+          <Coins className="w-6 h-6 text-primary-600" />
+          Your Token Balances
+        </h3>
+        
+        {isLoading ? (
+          <div className="text-center py-4 text-gray-500">Loading balances...</div>
+        ) : userBalances && userBalances.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {userBalances.map((token) => (
+              <div key={token.mint} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{token.icon}</span>
+                  <div>
+                    <div className="font-semibold text-gray-800">{token.symbol}</div>
+                    <div className="text-xs text-gray-500">{token.name}</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-gray-800">
+                    {token.balanceUi ? token.balanceUi.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '0'}
+                  </div>
+                  <div className="text-xs text-gray-500">{token.symbol}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-4 text-gray-500">
+            No supported tokens found. Hold USDC, SOL, BONK, WIF, or POPCAT.
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -75,6 +111,8 @@ function AppContent() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [userBalances, setUserBalances] = useState([])
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false)
 
   // Fetch pool stats on mount
   useEffect(() => {
@@ -97,6 +135,30 @@ function AppContent() {
 
     loadPoolStats()
   }, [connection])
+
+  // Fetch user balances when wallet connects
+  useEffect(() => {
+    if (!connected || !publicKey) {
+      setUserBalances([])
+      return
+    }
+
+    const loadBalances = async () => {
+      setIsLoadingBalances(true)
+      try {
+        const balances = await fetchUserBalances(connection, publicKey.toString())
+        setUserBalances(balances)
+        console.log('User token balances:', balances)
+      } catch (err) {
+        console.error('Error loading user balances:', err)
+        setUserBalances([])
+      } finally {
+        setIsLoadingBalances(false)
+      }
+    }
+
+    loadBalances()
+  }, [connected, publicKey, connection])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -132,7 +194,11 @@ function AppContent() {
             <WalletMultiButton />
           </div>
         ) : (
-          <ConnectedContent publicKey={publicKey} />
+          <ConnectedContent 
+            publicKey={publicKey} 
+            userBalances={userBalances}
+            isLoading={isLoadingBalances}
+          />
         )}
       </main>
 
