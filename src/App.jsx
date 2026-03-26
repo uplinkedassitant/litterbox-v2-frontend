@@ -118,7 +118,7 @@ function App() {
   const wallets = useMemo(() => [], [])
 
   return (
-    <ConnectionProvider config={{ endpoint }}>
+    <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
           <AppContent />
