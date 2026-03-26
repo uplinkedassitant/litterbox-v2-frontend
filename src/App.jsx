@@ -123,7 +123,7 @@ function ConnectedContent({ publicKey, userBalances, isLoading, poolData }) {
         <DepositForm
           selectedTokens={selectedTokens}
           poolData={poolData}
-          onDeposit={handleSubmit}
+          onDeposit={handleDepositSubmit}
           isSubmitting={isSubmitting}
         />
       )}
