@@ -5,18 +5,9 @@ import { Wallet as WalletIcon, TrendingUp, Coins, CheckCircle, RefreshCw } from 
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
-// Configuration - Use environment variable or default to Devnet
-const getRpcUrl = () => {
-  const envUrl = import.meta.env.VITE_RPC_URL
-  // Ensure we have a valid URL
-  if (envUrl && envUrl.startsWith('http')) {
-    return envUrl
-  }
-  // Default to Devnet
-  return 'https://api.devnet.solana.com'
-}
-
-const RPC_URL = getRpcUrl()
+// Configuration - Hardcoded Devnet URL to ensure it always works
+// Environment variables can be set in Vercel dashboard, but we default to Devnet
+const RPC_URL = 'https://api.devnet.solana.com'
 
 // Mock data for now
 const MOCK_POOL_DATA = {
