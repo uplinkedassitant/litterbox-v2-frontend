@@ -160,7 +160,14 @@ export async function submitDeposit(
   }
   
   if (instructions.length === 0) {
-    throw new Error('No valid deposits to submit (SOL needs to be wrapped to WSOL first)')
+    throw new Error('No valid deposits to submit')
+  }
+  
+  console.log(`Created ${instructions.length} deposit instruction(s)`)
+  
+  // Warn if some tokens were skipped
+  if (Object.keys(amounts).length > instructions.length) {
+    console.warn('Some tokens were skipped (SOL not supported yet)')
   }
   
   if (instructions.length === 0) {
