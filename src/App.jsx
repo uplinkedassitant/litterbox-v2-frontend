@@ -5,8 +5,18 @@ import { Wallet as WalletIcon, TrendingUp, Coins, CheckCircle, RefreshCw } from 
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
-// Configuration
-const RPC_URL = import.meta.env.VITE_RPC_URL || 'https://api.devnet.solana.com'
+// Configuration - Use environment variable or default to Devnet
+const getRpcUrl = () => {
+  const envUrl = import.meta.env.VITE_RPC_URL
+  // Ensure we have a valid URL
+  if (envUrl && envUrl.startsWith('http')) {
+    return envUrl
+  }
+  // Default to Devnet
+  return 'https://api.devnet.solana.com'
+}
+
+const RPC_URL = getRpcUrl()
 
 // Mock data for now
 const MOCK_POOL_DATA = {
