@@ -5,6 +5,7 @@ import { Wallet as WalletIcon, TrendingUp, Coins, CheckCircle, RefreshCw } from 
 import { clusterApiUrl } from '@solana/web3.js'
 import { fetchPoolStats } from './utils/poolStats'
 import { fetchUserBalances, SUPPORTED_TOKENS } from './utils/userBalances'
+import TokenSelector from './components/TokenSelector'
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
@@ -50,6 +51,19 @@ function PoolStats({ poolData, isLoading, error }) {
 
 // Wallet Content - shown when wallet is connected
 function ConnectedContent({ publicKey, userBalances, isLoading }) {
+  const [selectedTokens, setSelectedTokens] = useState([])
+
+  const handleToggleToken = (token) => {
+    setSelectedTokens(prev => {
+      const isSelected = prev.some(t => t.mint === token.mint)
+      if (isSelected) {
+        return prev.filter(t => t.mint !== token.mint)
+      } else {
+        return [...prev, token]
+      }
+    })
+  }
+
   return (
     <div className="space-y-6">
       <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 text-center">
@@ -60,41 +74,38 @@ function ConnectedContent({ publicKey, userBalances, isLoading }) {
         </p>
       </div>
 
-      {/* Token Balances */}
-      <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <Coins className="w-6 h-6 text-primary-600" />
-          Your Token Balances
-        </h3>
-        
-        {isLoading ? (
-          <div className="text-center py-4 text-gray-500">Loading balances...</div>
-        ) : userBalances && userBalances.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {userBalances.map((token) => (
-              <div key={token.mint} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{token.icon}</span>
-                  <div>
-                    <div className="font-semibold text-gray-800">{token.symbol}</div>
-                    <div className="text-xs text-gray-500">{token.name}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-gray-800">
-                    {token.balanceUi ? token.balanceUi.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '0'}
-                  </div>
-                  <div className="text-xs text-gray-500">{token.symbol}</div>
-                </div>
+      {/* Token Selector */}
+      <TokenSelector
+        tokens={userBalances}
+        selectedTokens={selectedTokens}
+        onToggleToken={handleToggleToken}
+        isLoading={isLoading}
+      />
+
+      {/* Selected tokens preview */}
+      {selectedTokens.length > 0 && (
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6">
+          <h3 className="text-lg font-bold text-blue-800 mb-3">
+            Selected Tokens ({selectedTokens.length})
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {selectedTokens.map(token => (
+              <div key={token.mint} className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg border border-blue-200">
+                <span>{token.icon}</span>
+                <span className="font-semibold text-gray-800">{token.symbol}</span>
+                <span className="text-sm text-gray-600">
+                  {token.balanceUi ? token.balanceUi.toLocaleString(undefined, { maximumFractionDigits: 4 }) : '0'}
+                </span>
               </div>
             ))}
           </div>
-        ) : (
-          <div className="text-center py-4 text-gray-500">
-            No supported tokens found. Hold USDC, SOL, BONK, WIF, or POPCAT.
+          <div className="mt-4 pt-4 border-t border-blue-200">
+            <p className="text-sm text-blue-700">
+              💡 Next: Enter deposit amounts and see real-time calculations
+            </p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
