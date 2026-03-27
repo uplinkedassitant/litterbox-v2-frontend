@@ -111,7 +111,8 @@ export async function submitDeposit(
 
       // Derive all ATA addresses
       const userUsdcAta = getAssociatedTokenAddressSync(USDC_MINT, publicKey);
-      const poolUsdcAta = getAssociatedTokenAddressSync(USDC_MINT, POOL_ACCOUNT);
+      // Pool USDC ATA - POOL_ACCOUNT is a PDA, so allowOwnerOffCurve: true is required
+      const poolUsdcAta = getAssociatedTokenAddressSync(USDC_MINT, POOL_ACCOUNT, true);
       const userLitterAta = getAssociatedTokenAddressSync(LITTER_MINT, publicKey);
 
       console.log('ATA addresses:');
