@@ -1,22 +1,22 @@
 /**
  * Fetch real pool statistics from LitterBox program
  * 
- * Program: BaLn7BEZCwsLaTqZcdogBy7B8NELJBHQn6Xt5ZnC2erq
+ * Program: 5w927F3TrrRCuAQ86whve3Qe864oT1gvGFrnd7rSKY3w
  * Network: Solana Devnet
  */
 
 import { PublicKey, Connection } from '@solana/web3.js';
 
 const PROGRAM_ID = new PublicKey(
-  import.meta.env.VITE_PROGRAM_ID || 'BaLn7BEZCwsLaTqZcdogBy7B8NELJBHQn6Xt5ZnC2erq'
+  import.meta.env.VITE_PROGRAM_ID || '5w927F3TrrRCuAQ86whve3Qe864oT1gvGFrnd7rSKY3w'
 );
 
 // Account addresses from initialization (PDAs)
 const CONFIG_ACCOUNT = new PublicKey(
-  import.meta.env.VITE_CONFIG_PDA || 'HogdhWq5BvA184quA9JVcw7wWPHVuwFqCHb3we1pFSz6'
+  import.meta.env.VITE_CONFIG_PDA || '7bibs5dbBwaUuWCc3yjSH6nu649WmQ7ifVicU4MZ6Ueu'
 );
 const POOL_ACCOUNT = new PublicKey(
-  import.meta.env.VITE_POOL_PDA || '3mZR1YUCnwG8Xvc3suibjGW1csyefYxxQhJ5FNLvJfKA'
+  import.meta.env.VITE_POOL_PDA || '7DgLSphFDzXA29ausgLpeydKzuW3b42HXrLppZb527MQ'
 );
 
 /**
