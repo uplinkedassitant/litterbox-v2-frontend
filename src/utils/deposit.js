@@ -235,3 +235,4 @@ export async function submitDeposit(
     throw error;
   }
 }
+// Force redeploy with correct env vars - Fri Mar 27 07:40:25 PM EDT 2026
