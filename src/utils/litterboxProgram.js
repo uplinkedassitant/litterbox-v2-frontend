@@ -8,7 +8,7 @@ import { TOKEN_PROGRAM_ID, getAccount, getMint } from '@solana/spl-token';
 
 // Program configuration
 export const PROGRAM_ID = new PublicKey(
-  import.meta.env.VITE_PROGRAM_ID || 'B3j1f4KLqEGq1VFnec5WUxg7ePMh9KFBPFBFnjDDpMvr'
+  import.meta.env.VITE_PROGRAM_ID || 'BaLn7BEZCwsLaTqZcdogBy7B8NELJBHQn6Xt5ZnC2erq'
 );
 
 export const LITTER_MINT = new PublicKey(

@@ -5,7 +5,7 @@
 
 import { PublicKey, Connection } from '@solana/web3.js';
 
-const PROGRAM_ID = new PublicKey('B3j1f4KLqEGq1VFnec5WUxg7ePMh9KFBPFBFnjDDpMvr');
+const PROGRAM_ID = new PublicKey('BaLn7BEZCwsLaTqZcdogBy7B8NELJBHQn6Xt5ZnC2erq');
 const RPC_URL = 'https://api.devnet.solana.com';
 
 /**

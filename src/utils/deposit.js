@@ -15,12 +15,20 @@ import {
 } from '@solana/spl-token';
 
 // Program configuration
-const PROGRAM_ID = new PublicKey('B3j1f4KLqEGq1VFnec5WUxg7ePMh9KFBPFBFnjDDpMvr');
-const LITTER_MINT = new PublicKey('FXyF4rttJ15yP9tBMdW24GchihjsnqZ1aqMsQvGPqbSR');
+const PROGRAM_ID = new PublicKey(
+  import.meta.env.VITE_PROGRAM_ID || 'BaLn7BEZCwsLaTqZcdogBy7B8NELJBHQn6Xt5ZnC2erq'
+);
 
 // Account addresses from initialization
-const CONFIG_ACCOUNT = new PublicKey('6z5WTnmMeiu1E68nxHSSnkyUgrzLWJvSvxdBJx59HG2a');
-const POOL_ACCOUNT = new PublicKey('Gz6sd1RT2xFt7QxfNrR7pEpxvqPkqTUV4GKLxZ7XnTMu');
+const CONFIG_ACCOUNT = new PublicKey(
+  import.meta.env.VITE_CONFIG_PDA || 'HogdhWq5BvA184quA9JVcw7wWPHVuwFqCHb3we1pFSz6'
+);
+const POOL_ACCOUNT = new PublicKey(
+  import.meta.env.VITE_POOL_PDA || '3iSk4FyKkGKrUiHXJse26uRdMwzX3n7mmfUDkCLYSVGo'
+);
+const LITTER_MINT = new PublicKey(
+  import.meta.env.VITE_LITTER_MINT || '9EJwVq9dfZHLH1AtRcH9eaJzewq4vmxUJPboja45DoZj'
+);
 
 // Token prices in USDC (for virtual deposit tracking)
 const TOKEN_PRICES = {

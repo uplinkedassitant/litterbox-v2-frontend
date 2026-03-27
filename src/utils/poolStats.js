@@ -1,18 +1,23 @@
 /**
  * Fetch real pool statistics from LitterBox program
  * 
- * Program: B3j1f4KLqEGq1VFnec5WUxg7ePMh9KFBPFBFnjDDpMvr
+ * Program: BaLn7BEZCwsLaTqZcdogBy7B8NELJBHQn6Xt5ZnC2erq
  * Network: Solana Devnet
  */
 
 import { PublicKey, Connection } from '@solana/web3.js';
 
-const PROGRAM_ID = new PublicKey('B3j1f4KLqEGq1VFnec5WUxg7ePMh9KFBPFBFnjDDpMvr');
+const PROGRAM_ID = new PublicKey(
+  import.meta.env.VITE_PROGRAM_ID || 'BaLn7BEZCwsLaTqZcdogBy7B8NELJBHQn6Xt5ZnC2erq'
+);
 
-// Account addresses from .litterbox-config.json
-// These are simple keypairs created during initialization (not PDAs)
-const CONFIG_ACCOUNT = new PublicKey('6z5WTnmMeiu1E68nxHSSnkyUgrzLWJvSvxdBJx59HG2a');
-const POOL_ACCOUNT = new PublicKey('Gz6sd1RT2xFt7QxfNrR7pEpxvqPkqTUV4GKLxZ7XnTMu');
+// Account addresses from initialization (PDAs)
+const CONFIG_ACCOUNT = new PublicKey(
+  import.meta.env.VITE_CONFIG_PDA || 'HogdhWq5BvA184quA9JVcw7wWPHVuwFqCHb3we1pFSz6'
+);
+const POOL_ACCOUNT = new PublicKey(
+  import.meta.env.VITE_POOL_PDA || '3iSk4FyKkGKrUiHXJse26uRdMwzX3n7mmfUDkCLYSVGo'
+);
 
 /**
  * Get program account addresses
