@@ -4,7 +4,12 @@
  */
 
 import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
+import {
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+  createAssociatedTokenAccountIdempotentInstruction,
+} from '@solana/spl-token';
 
 // Program configuration
 const PROGRAM_ID = new PublicKey(
@@ -22,58 +27,50 @@ const LITTER_MINT = new PublicKey(
   import.meta.env.VITE_LITTER_MINT || '9EJwVq9dfZHLH1AtRcH9eaJzewq4vmxUJPboja45DoZj'
 );
 
+// Token mints
+const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+
 // Instruction discriminators
 const DISC_DEPOSIT = 1;
 
 /**
  * Create deposit instruction with all required accounts
  */
-async function createDepositInstruction(
-  connection,
+function createDepositInstruction(
   userPubkey,
-  usdcAmount,  // Amount in smallest units
-  minLitterOut = 0n
+  userUsdcAta,
+  poolUsdcAta,
+  userLitterAta,
+  usdcAmount  // Amount in smallest units
 ) {
-  const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
+  // Create instruction data: [discriminator (1 byte), usdc_amount (8 bytes)]
+  const data = new Uint8Array(9);
+  data[0] = DISC_DEPOSIT;
   
-  try {
-    // Get token account addresses
-    const userUsdcAta = await getAssociatedTokenAddress(USDC_MINT, userPubkey);
-    const poolUsdcAta = await getAssociatedTokenAddress(USDC_MINT, POOL_ACCOUNT, true);
-    const userLitterAta = await getAssociatedTokenAddress(LITTER_MINT, userPubkey, true);
-
-    // Create instruction data: [discriminator (1 byte), usdc_amount (8 bytes)]
-    const data = new Uint8Array(9);
-    data[0] = DISC_DEPOSIT;
-    
-    // Write usdc_amount as u64 little-endian
-    for (let i = 0; i < 8; i++) {
-      data[i + 1] = Number((usdcAmount >> (8n * BigInt(i))) & 0xFFn);
-    }
-
-    // Create account keys
-    const keys = [
-      { pubkey: userPubkey, isSigner: true, isWritable: true },           // 0. user
-      { pubkey: userUsdcAta, isSigner: false, isWritable: true },         // 1. user_usdc_ata
-      { pubkey: poolUsdcAta, isSigner: false, isWritable: true },         // 2. pool_usdc_ata
-      { pubkey: CONFIG_ACCOUNT, isSigner: false, isWritable: true },      // 3. config_pda
-      { pubkey: POOL_ACCOUNT, isSigner: false, isWritable: true },        // 4. pool_pda
-      { pubkey: userLitterAta, isSigner: false, isWritable: true },       // 5. user_litter_ata
-      { pubkey: LITTER_MINT, isSigner: false, isWritable: false },        // 6. litter_mint
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },   // 7. token_program
-    ];
-
-    const instruction = new TransactionInstruction({
-      keys,
-      data,
-      programId: PROGRAM_ID,
-    });
-
-    return { instruction, userUsdcAta, poolUsdcAta, userLitterAta };
-  } catch (error) {
-    console.error('Error creating deposit instruction:', error);
-    throw error;
+  // Write usdc_amount as u64 little-endian
+  for (let i = 0; i < 8; i++) {
+    data[i + 1] = Number((usdcAmount >> (8n * BigInt(i))) & 0xFFn);
   }
+
+  // Create account keys
+  const keys = [
+    { pubkey: userPubkey, isSigner: true, isWritable: true },           // 0. user
+    { pubkey: userUsdcAta, isSigner: false, isWritable: true },         // 1. user_usdc_ata
+    { pubkey: poolUsdcAta, isSigner: false, isWritable: true },         // 2. pool_usdc_ata
+    { pubkey: CONFIG_ACCOUNT, isSigner: false, isWritable: true },      // 3. config_pda
+    { pubkey: POOL_ACCOUNT, isSigner: false, isWritable: true },        // 4. pool_pda
+    { pubkey: userLitterAta, isSigner: false, isWritable: true },       // 5. user_litter_ata
+    { pubkey: LITTER_MINT, isSigner: false, isWritable: false },        // 6. litter_mint
+    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },   // 7. token_program
+  ];
+
+  const instruction = new TransactionInstruction({
+    keys,
+    data,
+    programId: PROGRAM_ID,
+  });
+
+  return instruction;
 }
 
 /**
@@ -92,8 +89,6 @@ export async function submitDeposit(
 
   console.log('Deposit with publicKey:', publicKey.toString());
   console.log('Submitting deposit...', { amounts, tokens });
-
-  const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 
   try {
     // Process each token
@@ -114,22 +109,58 @@ export async function submitDeposit(
 
       console.log(`💰 Depositing ${amount} USDC (${usdcAmount.toString()} micro-units)`);
 
-      // Create deposit instruction
-      const { instruction, userUsdcAta, poolUsdcAta, userLitterAta } = await createDepositInstruction(
-        connection,
-        publicKey,
-        usdcAmount,
-        0n
-      );
+      // Derive all ATA addresses
+      const userUsdcAta = getAssociatedTokenAddressSync(USDC_MINT, publicKey);
+      const poolUsdcAta = getAssociatedTokenAddressSync(USDC_MINT, POOL_ACCOUNT);
+      const userLitterAta = getAssociatedTokenAddressSync(LITTER_MINT, publicKey);
 
-      console.log('Deposit instruction created:');
+      console.log('ATA addresses:');
       console.log('  - User USDC ATA:', userUsdcAta.toString());
       console.log('  - Pool USDC ATA:', poolUsdcAta.toString());
       console.log('  - User Litter ATA:', userLitterAta.toString());
 
-      // Create and send transaction
+      const instructions = [];
+
+      // Create idempotent ATA creation instructions (safe to include even if ATA exists)
+      // Pool USDC ATA - needs to exist to receive deposits
+      instructions.push(
+        createAssociatedTokenAccountIdempotentInstruction(
+          publicKey, // payer
+          poolUsdcAta, // ata address
+          POOL_ACCOUNT, // owner (the pool PDA)
+          USDC_MINT
+        )
+      );
+
+      // User Litter ATA - needs to exist to receive minted $LITTER
+      instructions.push(
+        createAssociatedTokenAccountIdempotentInstruction(
+          publicKey, // payer
+          userLitterAta, // ata address
+          publicKey, // owner (the user)
+          LITTER_MINT
+        )
+      );
+
+      // Create deposit instruction
+      const depositIx = createDepositInstruction(
+        publicKey,
+        userUsdcAta,
+        poolUsdcAta,
+        userLitterAta,
+        usdcAmount
+      );
+      instructions.push(depositIx);
+
+      console.log('Building transaction with', instructions.length, 'instructions...');
+
+      // Build transaction
+      const { blockhash } = await connection.getLatestBlockhash();
       const transaction = new Transaction();
-      transaction.add(instruction);
+      transaction.recentBlockhash = blockhash;
+      transaction.feePayer = publicKey;
+      
+      instructions.forEach(ix => transaction.add(ix));
 
       console.log('Sending transaction...');
       const signature = await sendTransaction(transaction, connection);
