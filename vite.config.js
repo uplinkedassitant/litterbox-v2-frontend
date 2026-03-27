@@ -4,11 +4,15 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   define: {
-    'global': 'globalThis',
+    global: 'globalThis',
+    'process.env': {},
   },
   resolve: {
     alias: {
-      buffer: 'buffer',
+      buffer: 'buffer/',
     },
+  },
+  optimizeDeps: {
+    include: ['buffer'],
   },
 })

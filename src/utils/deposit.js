@@ -35,22 +35,22 @@ const DISC_DEPOSIT = 1;
 
 /**
  * Create deposit instruction with all required accounts
+ * Uses DataView for proper u64 little-endian encoding
  */
 function createDepositInstruction(
   userPubkey,
   userUsdcAta,
   poolUsdcAta,
   userLitterAta,
-  usdcAmount  // Amount in smallest units
+  usdcAmount  // BigInt in smallest units
 ) {
-  // Create instruction data: [discriminator (1 byte), usdc_amount (8 bytes)]
+  // Create instruction data: [discriminator (1 byte), usdc_amount as u64 LE (8 bytes)]
   const data = new Uint8Array(9);
   data[0] = DISC_DEPOSIT;
   
-  // Write usdc_amount as u64 little-endian
-  for (let i = 0; i < 8; i++) {
-    data[i + 1] = Number((usdcAmount >> (8n * BigInt(i))) & 0xFFn);
-  }
+  // Use DataView for proper u64 little-endian encoding
+  const view = new DataView(data.buffer);
+  view.setBigUint64(1, usdcAmount, true); // true = little-endian
 
   // Create account keys
   const keys = [
@@ -122,7 +122,7 @@ export async function submitDeposit(
 
       const instructions = [];
 
-      // Create idempotent ATA creation instructions (safe to include even if ATA exists)
+      // Create idempotent ATA creation instructions (safe if they already exist)
       // Pool USDC ATA - needs to exist to receive deposits
       instructions.push(
         createAssociatedTokenAccountIdempotentInstruction(
@@ -143,7 +143,7 @@ export async function submitDeposit(
         )
       );
 
-      // Create deposit instruction
+      // Create deposit instruction with proper u64 encoding
       const depositIx = createDepositInstruction(
         publicKey,
         userUsdcAta,
