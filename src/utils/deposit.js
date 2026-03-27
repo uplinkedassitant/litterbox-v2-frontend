@@ -3,8 +3,8 @@
  * Transfers USDC to pool and mints Litter tokens to user
  */
 
-import { PublicKey, Transaction, SystemProgram, TransactionInstruction } from '@solana/web3.js';
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
+import { PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress, createAssociatedTokenAccountInstruction } from '@solana/spl-token';
 
 // Program configuration
 const PROGRAM_ID = new PublicKey(
@@ -26,68 +26,54 @@ const LITTER_MINT = new PublicKey(
 const DISC_DEPOSIT = 1;
 
 /**
- * Create deposit instruction
- * 
- * Account layout:
- * 0. [signer, writable] user
- * 1. [writable] user_usdc_ata
- * 2. [writable] pool_usdc_ata
- * 3. [writable] config_pda
- * 4. [writable] pool_pda
- * 5. [writable] user_litter_ata
- * 6. [] litter_mint
- * 7. [] token_program
+ * Create deposit instruction with all required accounts
  */
 async function createDepositInstruction(
   connection,
   userPubkey,
-  usdcAmount,  // Amount in smallest units (e.g., micro-USDC)
-  minLitterOut = 0n  // Minimum Litter tokens to receive
+  usdcAmount,  // Amount in smallest units
+  minLitterOut = 0n
 ) {
-  // Get token account addresses
-  const userUsdcAta = await getAssociatedTokenAddress(
-    new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'), // USDC mint
-    userPubkey
-  );
+  const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
   
-  const poolUsdcAta = await getAssociatedTokenAddress(
-    new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'), // USDC mint
-    POOL_ACCOUNT
-  );
-  
-  const userLitterAta = await getAssociatedTokenAddress(
-    LITTER_MINT,
-    userPubkey
-  );
+  try {
+    // Get token account addresses
+    const userUsdcAta = await getAssociatedTokenAddress(USDC_MINT, userPubkey);
+    const poolUsdcAta = await getAssociatedTokenAddress(USDC_MINT, POOL_ACCOUNT, true);
+    const userLitterAta = await getAssociatedTokenAddress(LITTER_MINT, userPubkey, true);
 
-  // Create instruction data: [discriminator (1 byte), usdc_amount (8 bytes)]
-  const data = new Uint8Array(9);
-  data[0] = DISC_DEPOSIT;
-  
-  // Write usdc_amount as u64 little-endian
-  for (let i = 0; i < 8; i++) {
-    data[i + 1] = Number((usdcAmount >> (8n * BigInt(i))) & 0xFFn);
+    // Create instruction data: [discriminator (1 byte), usdc_amount (8 bytes)]
+    const data = new Uint8Array(9);
+    data[0] = DISC_DEPOSIT;
+    
+    // Write usdc_amount as u64 little-endian
+    for (let i = 0; i < 8; i++) {
+      data[i + 1] = Number((usdcAmount >> (8n * BigInt(i))) & 0xFFn);
+    }
+
+    // Create account keys
+    const keys = [
+      { pubkey: userPubkey, isSigner: true, isWritable: true },           // 0. user
+      { pubkey: userUsdcAta, isSigner: false, isWritable: true },         // 1. user_usdc_ata
+      { pubkey: poolUsdcAta, isSigner: false, isWritable: true },         // 2. pool_usdc_ata
+      { pubkey: CONFIG_ACCOUNT, isSigner: false, isWritable: true },      // 3. config_pda
+      { pubkey: POOL_ACCOUNT, isSigner: false, isWritable: true },        // 4. pool_pda
+      { pubkey: userLitterAta, isSigner: false, isWritable: true },       // 5. user_litter_ata
+      { pubkey: LITTER_MINT, isSigner: false, isWritable: false },        // 6. litter_mint
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },   // 7. token_program
+    ];
+
+    const instruction = new TransactionInstruction({
+      keys,
+      data,
+      programId: PROGRAM_ID,
+    });
+
+    return { instruction, userUsdcAta, poolUsdcAta, userLitterAta };
+  } catch (error) {
+    console.error('Error creating deposit instruction:', error);
+    throw error;
   }
-
-  // Create account keys
-  const keys = [
-    { pubkey: userPubkey, isSigner: true, isWritable: true },           // 0. user
-    { pubkey: userUsdcAta, isSigner: false, isWritable: true },         // 1. user_usdc_ata
-    { pubkey: poolUsdcAta, isSigner: false, isWritable: true },         // 2. pool_usdc_ata
-    { pubkey: CONFIG_ACCOUNT, isSigner: false, isWritable: true },      // 3. config_pda
-    { pubkey: POOL_ACCOUNT, isSigner: false, isWritable: true },        // 4. pool_pda
-    { pubkey: userLitterAta, isSigner: false, isWritable: true },       // 5. user_litter_ata
-    { pubkey: LITTER_MINT, isSigner: false, isWritable: false },        // 6. litter_mint
-    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },   // 7. token_program
-  ];
-
-  const instruction = new TransactionInstruction({
-    keys,
-    data,
-    programId: PROGRAM_ID,
-  });
-
-  return { instruction };
 }
 
 /**
@@ -96,8 +82,8 @@ async function createDepositInstruction(
 export async function submitDeposit(
   connection,
   publicKey,
-  amounts,  // { [mint]: amount }
-  tokens,   // Array of token objects
+  amounts,
+  tokens,
   sendTransaction
 ) {
   if (!publicKey) {
@@ -107,77 +93,66 @@ export async function submitDeposit(
   console.log('Deposit with publicKey:', publicKey.toString());
   console.log('Submitting deposit...', { amounts, tokens });
 
-  const instructions = [];
-  const depositDetails = [];
+  const USDC_MINT = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 
-  // Process each token
-  for (const [mint, amount] of Object.entries(amounts)) {
-    if (!amount || amount <= 0) continue;
+  try {
+    // Process each token
+    for (const [mint, amount] of Object.entries(amounts)) {
+      if (!amount || amount <= 0) continue;
 
-    const token = tokens.find(t => t.mint === mint);
-    if (!token) continue;
+      const token = tokens.find(t => t.mint === mint);
+      if (!token) continue;
 
-    // Only support USDC for now
-    if (token.symbol !== 'USDC') {
-      console.log(`Skipping ${token.symbol} - only USDC supported`);
-      continue;
-    }
+      // Only support USDC for now
+      if (token.symbol !== 'USDC') {
+        console.log(`Skipping ${token.symbol} - only USDC supported`);
+        continue;
+      }
 
-    // Convert to smallest units (micro-USDC for 6 decimals)
-    const usdcAmount = BigInt(Math.floor(amount * 1_000_000));
+      // Convert to smallest units (micro-USDC for 6 decimals)
+      const usdcAmount = BigInt(Math.floor(amount * 1_000_000));
 
-    try {
-      // Create deposit instruction with all required accounts
-      const { instruction } = await createDepositInstruction(
+      console.log(`💰 Depositing ${amount} USDC (${usdcAmount.toString()} micro-units)`);
+
+      // Create deposit instruction
+      const { instruction, userUsdcAta, poolUsdcAta, userLitterAta } = await createDepositInstruction(
         connection,
         publicKey,
         usdcAmount,
-        0n  // No minimum Litter out
+        0n
       );
 
-      instructions.push(instruction);
-      depositDetails.push({
-        token: token.symbol,
-        amount,
-        usdcAmount: usdcAmount.toString(),
-        mint,
-      });
-    } catch (error) {
-      console.error(`Error creating deposit instruction for ${token.symbol}:`, error);
-      throw error;
+      console.log('Deposit instruction created:');
+      console.log('  - User USDC ATA:', userUsdcAta.toString());
+      console.log('  - Pool USDC ATA:', poolUsdcAta.toString());
+      console.log('  - User Litter ATA:', userLitterAta.toString());
+
+      // Create and send transaction
+      const transaction = new Transaction();
+      transaction.add(instruction);
+
+      console.log('Sending transaction...');
+      const signature = await sendTransaction(transaction, connection);
+      console.log('Transaction sent:', signature);
+
+      console.log('Waiting for confirmation...');
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      console.log('Confirmation result:', confirmation);
+
+      return {
+        success: true,
+        signature,
+        depositDetails: {
+          token: 'USDC',
+          amount,
+          usdcAmount: usdcAmount.toString(),
+        },
+      };
     }
-  }
 
-  if (instructions.length === 0) {
     throw new Error('No valid deposits. Please use USDC.');
-  }
-
-  console.log('Deposit details:', depositDetails);
-
-  // Create and send transaction
-  const transaction = new Transaction();
-  transaction.add(...instructions);
-
-  console.log('Transaction created:');
-  console.log('- Instructions:', instructions.length);
-  console.log('- Fee payer:', publicKey.toString());
-
-  try {
-    console.log('Sending transaction via wallet adapter...');
-    const signature = await sendTransaction(transaction, connection);
-    console.log('Transaction sent with signature:', signature);
-
-    console.log('Waiting for confirmation...');
-    const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-    console.log('Confirmation result:', confirmation);
-
-    return {
-      success: true,
-      signature,
-      depositDetails,
-    };
   } catch (error) {
-    console.error('Transaction error details:', error);
+    console.error('Deposit failed:', error);
     throw error;
   }
 }
