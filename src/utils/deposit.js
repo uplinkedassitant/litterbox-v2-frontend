@@ -1,18 +1,10 @@
 /**
  * Submit deposit transaction to LitterBox program
- * Supports any SPL token (converts to USDC value for virtual tracking)
+ * Transfers USDC to pool and mints Litter tokens to user
  */
 
-import { 
-  PublicKey, 
-  Transaction, 
-  SystemProgram,
-  TransactionInstruction,
-} from '@solana/web3.js';
-import { 
-  TOKEN_PROGRAM_ID, 
-  getAssociatedTokenAddress,
-} from '@solana/spl-token';
+import { PublicKey, Transaction, SystemProgram, TransactionInstruction } from '@solana/web3.js';
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } from '@solana/spl-token';
 
 // Program configuration
 const PROGRAM_ID = new PublicKey(
@@ -30,194 +22,162 @@ const LITTER_MINT = new PublicKey(
   import.meta.env.VITE_LITTER_MINT || '9EJwVq9dfZHLH1AtRcH9eaJzewq4vmxUJPboja45DoZj'
 );
 
-// Token prices in USDC (for virtual deposit tracking)
-const TOKEN_PRICES = {
-  'USDC': 1.0,
-  'SOL': 150.0,
-  'BONK': 0.00001,
-  'WIF': 2.5,
-  'POPCAT': 0.5,
-};
-
 // Instruction discriminators
 const DISC_DEPOSIT = 1;
 
 /**
- * Create deposit instruction for a token
- * Backend tracks virtual USDC value
+ * Create deposit instruction
+ * 
+ * Account layout:
+ * 0. [signer, writable] user
+ * 1. [writable] user_usdc_ata
+ * 2. [writable] pool_usdc_ata
+ * 3. [writable] config_pda
+ * 4. [writable] pool_pda
+ * 5. [writable] user_litter_ata
+ * 6. [] litter_mint
+ * 7. [] token_program
  */
 async function createDepositInstruction(
   connection,
   userPubkey,
-  tokenMint,
-  usdcValue, // USDC-equivalent value
-  tokenDecimals = 6
+  usdcAmount,  // Amount in smallest units (e.g., micro-USDC)
+  minLitterOut = 0n  // Minimum Litter tokens to receive
 ) {
-  // Create deposit instruction data
-  // Format: [discriminator (1 byte), usdc_amount (8 bytes), min_litter_out (8 bytes)]
-  const data = new Uint8Array(17);
+  // Get token account addresses
+  const userUsdcAta = await getAssociatedTokenAddress(
+    new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'), // USDC mint
+    userPubkey
+  );
+  
+  const poolUsdcAta = await getAssociatedTokenAddress(
+    new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'), // USDC mint
+    POOL_ACCOUNT
+  );
+  
+  const userLitterAta = await getAssociatedTokenAddress(
+    LITTER_MINT,
+    userPubkey
+  );
+
+  // Create instruction data: [discriminator (1 byte), usdc_amount (8 bytes)]
+  const data = new Uint8Array(9);
   data[0] = DISC_DEPOSIT;
   
   // Write usdc_amount as u64 little-endian
-  const usdcAmountBN = BigInt(Math.floor(usdcValue * Math.pow(10, tokenDecimals)));
   for (let i = 0; i < 8; i++) {
-    data[i + 1] = Number((usdcAmountBN >> (8n * BigInt(i))) & 0xFFn);
+    data[i + 1] = Number((usdcAmount >> (8n * BigInt(i))) & 0xFFn);
   }
-  
-  // Write min_litter_out as u64 little-endian (0 = no minimum)
-  const minLitterOut = 0n;
-  for (let i = 0; i < 8; i++) {
-    data[i + 9] = Number((minLitterOut >> (8n * BigInt(i))) & 0xFFn);
-  }
-  
-  // Backend expects 3 accounts: user, config, pool
+
+  // Create account keys
   const keys = [
-    { pubkey: userPubkey, isSigner: true, isWritable: true },
-    { pubkey: CONFIG_ACCOUNT, isSigner: false, isWritable: true },
-    { pubkey: POOL_ACCOUNT, isSigner: false, isWritable: true },
+    { pubkey: userPubkey, isSigner: true, isWritable: true },           // 0. user
+    { pubkey: userUsdcAta, isSigner: false, isWritable: true },         // 1. user_usdc_ata
+    { pubkey: poolUsdcAta, isSigner: false, isWritable: true },         // 2. pool_usdc_ata
+    { pubkey: CONFIG_ACCOUNT, isSigner: false, isWritable: true },      // 3. config_pda
+    { pubkey: POOL_ACCOUNT, isSigner: false, isWritable: true },        // 4. pool_pda
+    { pubkey: userLitterAta, isSigner: false, isWritable: true },       // 5. user_litter_ata
+    { pubkey: LITTER_MINT, isSigner: false, isWritable: false },        // 6. litter_mint
+    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },   // 7. token_program
   ];
-  
+
   const instruction = new TransactionInstruction({
     keys,
     data,
     programId: PROGRAM_ID,
   });
-  
+
   return { instruction };
 }
 
 /**
- * Submit deposit for any SPL token
- * Converts token amount to USDC value using hardcoded prices
+ * Submit deposit for USDC tokens
  */
 export async function submitDeposit(
   connection,
   publicKey,
-  amounts, // { [mint]: amount }
+  amounts,  // { [mint]: amount }
   tokens,   // Array of token objects
   sendTransaction
 ) {
   if (!publicKey) {
     throw new Error('No publicKey provided');
   }
-  
+
   console.log('Deposit with publicKey:', publicKey.toString());
   console.log('Submitting deposit...', { amounts, tokens });
-  
+
   const instructions = [];
   const depositDetails = [];
-  
+
   // Process each token
   for (const [mint, amount] of Object.entries(amounts)) {
     if (!amount || amount <= 0) continue;
-    
+
     const token = tokens.find(t => t.mint === mint);
     if (!token) continue;
-    
-    // Skip SOL (native) - needs WSOL wrap first
-    if (token.symbol === 'SOL') {
-      console.log(`Skipping ${token.symbol} - native SOL needs WSOL wrapping`);
+
+    // Only support USDC for now
+    if (token.symbol !== 'USDC') {
+      console.log(`Skipping ${token.symbol} - only USDC supported`);
       continue;
     }
-    
-    // Calculate USDC value using token prices
-    const usdcValue = amount * (TOKEN_PRICES[token.symbol] || 0);
-    
-    if (usdcValue > 0) {
-      // Create deposit instruction with USDC value
+
+    // Convert to smallest units (micro-USDC for 6 decimals)
+    const usdcAmount = BigInt(Math.floor(amount * 1_000_000));
+
+    try {
+      // Create deposit instruction with all required accounts
       const { instruction } = await createDepositInstruction(
         connection,
         publicKey,
-        mint,
-        usdcValue,
-        6 // USDC decimals
+        usdcAmount,
+        0n  // No minimum Litter out
       );
-      
+
       instructions.push(instruction);
       depositDetails.push({
         token: token.symbol,
         amount,
-        usdcValue,
+        usdcAmount: usdcAmount.toString(),
         mint,
       });
+    } catch (error) {
+      console.error(`Error creating deposit instruction for ${token.symbol}:`, error);
+      throw error;
     }
   }
-  
+
   if (instructions.length === 0) {
-    throw new Error('No valid deposits. USDC works, or wrap SOL to WSOL first.');
+    throw new Error('No valid deposits. Please use USDC.');
   }
-  
-  const totalUsdcValue = depositDetails.reduce((sum, d) => sum + d.usdcValue, 0);
-  console.log(`Processing ${instructions.length} token(s) with total USDC value: $${totalUsdcValue.toFixed(2)}`);
+
   console.log('Deposit details:', depositDetails);
-  
-  // Create transaction with all instructions
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+
+  // Create and send transaction
   const transaction = new Transaction();
-  transaction.feePayer = publicKey;
-  transaction.recentBlockhash = blockhash;
-  transaction.lastValidBlockHeight = lastValidBlockHeight;
-  
-  instructions.forEach(ix => transaction.add(ix));
-  
+  transaction.add(...instructions);
+
   console.log('Transaction created:');
-  console.log('- Instructions:', transaction.instructions.length);
-  console.log('- Fee payer:', transaction.feePayer?.toString());
-  console.log('- Blockhash:', transaction.recentBlockhash);
-  
-  console.log('Sending transaction via wallet adapter...');
-  
-  // Use wallet adapter's sendTransaction
-  let signature;
+  console.log('- Instructions:', instructions.length);
+  console.log('- Fee payer:', publicKey.toString());
+
   try {
-    signature = await sendTransaction(transaction, connection, { skipPreflight: true });
+    console.log('Sending transaction via wallet adapter...');
+    const signature = await sendTransaction(transaction, connection);
     console.log('Transaction sent with signature:', signature);
+
+    console.log('Waiting for confirmation...');
+    const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+    console.log('Confirmation result:', confirmation);
+
+    return {
+      success: true,
+      signature,
+      depositDetails,
+    };
   } catch (error) {
-    console.error('sendTransaction error:', error);
+    console.error('Transaction error details:', error);
     throw error;
   }
-  
-  if (!signature) {
-    throw new Error('No signature returned from sendTransaction');
-  }
-  
-  console.log('Waiting for confirmation...');
-  
-  // Wait for confirmation
-  const latestBlockhash = await connection.getLatestBlockhash();
-  const confirmation = await connection.confirmTransaction(
-    {
-      signature,
-      blockhash: latestBlockhash.blockhash,
-      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-    },
-    'confirmed'
-  );
-  
-  console.log('Confirmation result:', confirmation);
-  
-  if (confirmation.value.err) {
-    console.error('Transaction error details:', confirmation.value.err);
-    const errorMsg = typeof confirmation.value.err === 'object' 
-      ? JSON.stringify(confirmation.value.err) 
-      : confirmation.value.err.toString();
-    throw new Error(`Transaction failed: ${errorMsg}`);
-  }
-  
-  console.log('✅ Deposit successful!', {
-    signature,
-    deposits: depositDetails,
-  });
-  
-  return {
-    signature,
-    deposits: depositDetails,
-  };
 }
-
-export default {
-  submitDeposit,
-  PROGRAM_ID,
-  LITTER_MINT,
-};
-// CACHE BUST: pool-40bytes-1774636375
