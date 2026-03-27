@@ -8,6 +8,7 @@ import { fetchUserBalances, SUPPORTED_TOKENS } from './utils/userBalances'
 import TokenSelector from './components/TokenSelector'
 import DepositForm from './components/DepositForm'
 import { submitDeposit } from './utils/deposit'
+import { swapTokenToUSDC, getTokenUSDCValue } from './utils/jupiterSwap'
 import '@solana/wallet-adapter-react-ui/styles.css'
 import './App.css'
 
@@ -166,49 +167,99 @@ function AppContent() {
     loadBalances()
   }, [connected, publicKey, connection])
 
-  // Handle deposit
+  // Handle deposit with automatic Jupiter swap
   const handleDeposit = async (amounts) => {
-    console.log('Submitting deposit:', amounts)
-    console.log('Using publicKey:', publicKey?.toString())
-    console.log('Connection RPC:', connection?.rpcEndpoint)
-    console.log('sendTransaction function:', typeof sendTransaction)
+    console.log('Starting deposit with Jupiter swap...', amounts)
     
     // Check wallet state
     if (!connected || !publicKey) {
       throw new Error('Wallet not connected')
     }
     
-    if (!sendTransaction) {
-      throw new Error('Wallet does not support sendTransaction')
-    }
-    
-    console.log('Proceeding with deposit for:', publicKey.toString())
-    
-    // Import the deposit logic
-    const { submitDeposit } = await import('./utils/deposit')
-    
     try {
-      const result = await submitDeposit(connection, publicKey, amounts, userBalances, sendTransaction)
-      console.log('✅ Deposit successful!', result)
+      const swapResults = [];
+      let totalUsdcValue = 0;
       
-      // Wait a moment for the network to update, then refresh pool stats
-      console.log('Waiting 2 seconds for network to update...')
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Step 1: Swap non-USDC tokens to USDC via Jupiter
+      for (const [mint, amount] of Object.entries(amounts)) {
+        if (!amount || amount <= 0) continue;
+        
+        const token = userBalances.find(t => t.mint === mint);
+        if (!token) continue;
+        
+        // Skip if already USDC
+        if (token.symbol === 'USDC') {
+          totalUsdcValue += parseFloat(amount);
+          continue;
+        }
+        
+        // Skip SOL (needs WSOL wrap first)
+        if (token.symbol === 'SOL') {
+          console.warn(`Skipping SOL - needs WSOL wrap first`);
+          continue;
+        }
+        
+        console.log(`🔄 Swapping ${amount} ${token.symbol} → USDC via Jupiter...`);
+        
+        // Convert to smallest units
+        const amountWithDecimals = Math.floor(amount * Math.pow(10, token.decimals || 6));
+        
+        // Swap via Jupiter
+        const swapResult = await swapTokenToUSDC(
+          connection,
+          wallet,
+          mint,
+          amountWithDecimals,
+          50 // 0.5% slippage
+        );
+        
+        swapResults.push(swapResult);
+        
+        // Add USDC received to total
+        const usdcReceived = parseFloat(swapResult.outAmount) / 1e6;
+        totalUsdcValue += usdcReceived;
+        
+        console.log(`✅ Swapped! Received ${usdcReceived} USDC`);
+      }
       
-      console.log('Refreshing pool stats...')
-      const stats = await fetchPoolStats(connection)
-      console.log('New pool stats:', stats)
-      setPoolData(stats)
+      // Wait a moment for balances to update
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Also refresh user balances
-      console.log('Refreshing user balances...')
-      const balances = await fetchUserBalances(connection, publicKey.toString())
-      setUserBalances(balances)
+      // Step 2: Deposit USDC using existing deposit instruction
+      console.log('💰 Depositing', totalUsdcValue, 'USDC into LitterBox...');
       
-      return result
+      const depositAmounts = {
+        '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU': totalUsdcValue.toString()
+      };
+      
+      const depositResult = await submitDeposit(
+        connection,
+        publicKey,
+        depositAmounts,
+        userBalances,
+        sendTransaction
+      );
+      
+      console.log('✅ Deposit successful!', depositResult);
+      
+      // Wait for network update
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Refresh pool stats and balances
+      const stats = await fetchPoolStats(connection);
+      setPoolData(stats);
+      
+      const balances = await fetchUserBalances(connection, publicKey.toString());
+      setUserBalances(balances);
+      
+      return {
+        swapResults,
+        depositResult,
+        totalUsdcDeposited: totalUsdcValue,
+      };
     } catch (error) {
-      console.error('Deposit failed:', error)
-      throw error
+      console.error('Deposit failed:', error);
+      throw error;
     }
   }
 
