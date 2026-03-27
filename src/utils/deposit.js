@@ -24,7 +24,7 @@ const CONFIG_ACCOUNT = new PublicKey(
   import.meta.env.VITE_CONFIG_PDA || 'HogdhWq5BvA184quA9JVcw7wWPHVuwFqCHb3we1pFSz6'
 );
 const POOL_ACCOUNT = new PublicKey(
-  import.meta.env.VITE_POOL_PDA || '3iSk4FyKkGKrUiHXJse26uRdMwzX3n7mmfUDkCLYSVGo'
+  import.meta.env.VITE_POOL_PDA || '3mZR1YUCnwG8Xvc3suibjGW1csyefYxxQhJ5FNLvJfKA'
 );
 const LITTER_MINT = new PublicKey(
   import.meta.env.VITE_LITTER_MINT || '9EJwVq9dfZHLH1AtRcH9eaJzewq4vmxUJPboja45DoZj'
