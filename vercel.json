@@ -13,7 +13,7 @@
   "env": {
     "VITE_PROGRAM_ID": "BaLn7BEZCwsLaTqZcdogBy7B8NELJBHQn6Xt5ZnC2erq",
     "VITE_CONFIG_PDA": "HogdhWq5BvA184quA9JVcw7wWPHVuwFqCHb3we1pFSz6",
-    "VITE_POOL_PDA": "3iSk4FyKkGKrUiHXJse26uRdMwzX3n7mmfUDkCLYSVGo",
+    "VITE_POOL_PDA": "3mZR1YUCnwG8Xvc3suibjGW1csyefYxxQhJ5FNLvJfKA",
     "VITE_LITTER_MINT": "9EJwVq9dfZHLH1AtRcH9eaJzewq4vmxUJPboja45DoZj",
     "VITE_NETWORK": "devnet",
     "VITE_RPC_URL": "https://api.devnet.solana.com"
