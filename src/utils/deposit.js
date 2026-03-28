@@ -202,6 +202,25 @@ export async function submitDeposit(
       });
 
       console.log('Sending transaction to wallet...');
+      
+      // Simulate first to catch program errors
+      try {
+        console.log('🔍 Simulating transaction...');
+        const simResult = await connection.simulateTransaction(transaction, { commitment: 'confirmed', verifySignatures: false });
+        
+        if (simResult.value.err) {
+          console.error('❌ Simulation FAILED:', simResult.value.err);
+          if (simResult.value.logs) {
+            console.error('Program logs:', simResult.value.logs);
+          }
+          throw new Error('Simulation failed: ' + JSON.stringify(simResult.value.err));
+        }
+        console.log('✅ Simulation OK');
+      } catch (e) {
+        console.error('Simulation error:', e);
+        throw e;
+      }
+      
       const signature = await sendTransaction(transaction, connection);
       console.log('Transaction sent:', signature);
 
